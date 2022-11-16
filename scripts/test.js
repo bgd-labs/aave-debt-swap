@@ -35,8 +35,8 @@ async function main(from, to, method, amount, user) {
     { ignoreChecks: true }
   );
   const encodedData = defaultAbiCoder.encode(
-    ["address", "bytes"],
-    [txParams.to, txParams.data]
+    ["address", "bytes", "uint256"],
+    [txParams.to, txParams.data, priceRoute.destAmount]
   );
 
   process.stdout.write(encodedData);
