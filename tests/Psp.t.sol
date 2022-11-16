@@ -28,7 +28,7 @@ library AugustusRegistry {
     IParaSwapAugustusRegistry(0x6e7bE86000dF697facF4396efD2aE2C322165dC3);
 }
 
-contract DebtSwapTest is Test {
+contract PspTest is Test {
   ParaSwapLiquiditySwapAdapter public lqSwapAdapter;
   ParaSwapRepayAdapter public repayAdapter;
 
@@ -60,16 +60,18 @@ contract DebtSwapTest is Test {
     address from,
     address to,
     uint256 amount,
-    address swapUser
+    address userAddress,
+    bool sell
   ) internal returns (address, bytes memory, uint256) {
-    string[] memory inputs = new string[](7);
+    string[] memory inputs = new string[](8);
     inputs[0] = 'node';
-    inputs[1] = './scripts/test.js';
+    inputs[1] = './scripts/psp.js';
     inputs[2] = vm.toString(block.chainid);
     inputs[3] = vm.toString(from);
     inputs[4] = vm.toString(to);
     inputs[5] = vm.toString(amount);
-    inputs[6] = vm.toString(swapUser);
+    inputs[6] = vm.toString(userAddress);
+    inputs[7] = sell ? 'SELL' : 'BUY';
     bytes memory res = vm.ffi(inputs);
     return abi.decode(res, (address, bytes, uint256));
   }
@@ -86,7 +88,7 @@ contract DebtSwapTest is Test {
       address augustus,
       bytes memory swapCalldata,
       uint256 amountOut
-    ) = _fetchPSPRoute(BAL, DAI, amount, user);
+    ) = _fetchPSPRoute(BAL, DAI, amount, user, true);
     BaseParaSwapAdapter.PermitSignature memory signature;
 
     IERC20Detailed(A_BAL).approve(address(lqSwapAdapter), amount);

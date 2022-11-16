@@ -9,7 +9,7 @@ const FROM = args[1];
 const TO = args[2];
 const AMOUNT = args[3];
 const USER_ADDRESS = args[4];
-const METHOD = SwapSide.SELL;
+const METHOD = args[5];
 
 const paraSwapMin = constructSimpleSDK({ chainId: CHAIN_ID, axios });
 
