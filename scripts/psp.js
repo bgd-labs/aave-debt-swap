@@ -1,5 +1,6 @@
 const { constructSimpleSDK, SwapSide } = require("@paraswap/sdk");
 const axios = require("axios");
+const { BigNumber } = require("ethers");
 const { defaultAbiCoder } = require("ethers/lib/utils");
 
 const args = process.argv.slice(2);
@@ -13,21 +14,36 @@ const METHOD = args[5];
 
 const paraSwapMin = constructSimpleSDK({ chainId: CHAIN_ID, axios });
 
+const maxSlippage = 3;
+
 async function main(from, to, method, amount, user) {
   const priceRoute = await paraSwapMin.swap.getRate({
     srcToken: from,
+    srcDecimals: 18,
     destToken: to,
+    destDecimals: 18,
     amount: amount,
     side: method,
   });
-  // console.log(priceRoute);
 
   const txParams = await paraSwapMin.swap.buildTx(
     {
       srcToken: priceRoute.srcToken,
       destToken: priceRoute.destToken,
-      srcAmount: priceRoute.srcAmount,
-      destAmount: priceRoute.destAmount,
+      srcAmount:
+        METHOD === SwapSide.SELL
+          ? priceRoute.srcAmount
+          : BigNumber.from(priceRoute.srcAmount)
+              .mul(100 + maxSlippage)
+              .div(100)
+              .toString(),
+      destAmount:
+        METHOD === SwapSide.SELL
+          ? BigNumber.from(priceRoute.srcAmount)
+              .mul(100 - maxSlippage)
+              .div(100)
+              .toString()
+          : priceRoute.destAmount,
       priceRoute,
       userAddress: user,
       partner: "aave",
@@ -35,8 +51,8 @@ async function main(from, to, method, amount, user) {
     { ignoreChecks: true }
   );
   const encodedData = defaultAbiCoder.encode(
-    ["address", "bytes", "uint256"],
-    [txParams.to, txParams.data, priceRoute.destAmount]
+    ["address", "bytes", "uint256", "uint256"],
+    [txParams.to, txParams.data, priceRoute.srcAmount, priceRoute.destAmount]
   );
 
   process.stdout.write(encodedData);

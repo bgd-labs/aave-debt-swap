@@ -32,15 +32,15 @@ contract PspTest is Test {
   ParaSwapLiquiditySwapAdapter public lqSwapAdapter;
   ParaSwapRepayAdapter public repayAdapter;
 
-  address public constant BAL = 0x9a71012B13CA4d3D0Cdc72A177DF3ef03b0E76A3;
-  address public constant A_BAL = 0x8ffDf2DE812095b1D19CB146E4c004587C0A0692;
+  address public constant USDC = 0xa3Fa99A148fA48D14Ed51d610c367C61876997F1;
+  address public constant A_USDC = 0xeBe517846d0F36eCEd99C735cbF6131e1fEB775D;
   address public constant DAI = 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063;
   address public constant A_DAI = 0x82E64f49Ed5EC1bC6e43DAD4FC8Af9bb3A2312EE;
 
   address public user;
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl('polygon'), 35683611);
+    vm.createSelectFork(vm.rpcUrl('polygon'), 35686387);
     lqSwapAdapter = new ParaSwapLiquiditySwapAdapter(
       IPoolAddressesProvider(address(AaveV3Polygon.POOL_ADDRESSES_PROVIDER)),
       AugustusRegistry.POLYGON,
@@ -62,7 +62,7 @@ contract PspTest is Test {
     uint256 amount,
     address userAddress,
     bool sell
-  ) internal returns (address, bytes memory, uint256) {
+  ) internal returns (address, bytes memory, uint256, uint256) {
     string[] memory inputs = new string[](8);
     inputs[0] = 'node';
     inputs[1] = './scripts/psp.js';
@@ -73,40 +73,76 @@ contract PspTest is Test {
     inputs[6] = vm.toString(userAddress);
     inputs[7] = sell ? 'SELL' : 'BUY';
     bytes memory res = vm.ffi(inputs);
-    return abi.decode(res, (address, bytes, uint256));
+    return abi.decode(res, (address, bytes, uint256, uint256));
+  }
+
+  function _supply(uint256 amount, address asset) internal {
+    deal(asset, user, amount);
+    IERC20Detailed(asset).approve(address(AaveV3Polygon.POOL), amount);
+    AaveV3Polygon.POOL.supply(asset, amount, user, 0);
+  }
+
+  function _borrow(uint256 amount, address asset) internal {
+    AaveV3Polygon.POOL.borrow(asset, amount, 2, 0, user);
   }
 
   function test_swapCollateral_leaveDust_noPermit() public {
     uint256 amount = 10 ether;
-    deal(BAL, user, amount);
-    IERC20Detailed(BAL).approve(address(AaveV3Polygon.POOL), amount);
-    AaveV3Polygon.POOL.supply(BAL, amount, user, 0);
+    _supply(amount, USDC);
 
     skip(100);
-
     (
       address augustus,
       bytes memory swapCalldata,
-      uint256 amountOut
-    ) = _fetchPSPRoute(BAL, DAI, amount, user, true);
+      ,
+      uint256 destAmount
+    ) = _fetchPSPRoute(USDC, DAI, amount, user, true);
     BaseParaSwapAdapter.PermitSignature memory signature;
 
-    IERC20Detailed(A_BAL).approve(address(lqSwapAdapter), amount);
+    IERC20Detailed(A_USDC).approve(address(lqSwapAdapter), amount);
     lqSwapAdapter.swapAndDeposit(
-      IERC20Detailed(BAL),
+      IERC20Detailed(USDC),
       IERC20Detailed(DAI),
       amount,
-      (amountOut * 99) / 100, // 1% slippage
+      (destAmount * 98) / 100, // 1% slippage
       0,
       swapCalldata,
       IParaSwapAugustus(augustus),
       signature
     );
 
-    uint256 aBALBalanceAfter = IERC20Detailed(A_BAL).balanceOf(user);
+    uint256 aUSDCBalanceAfter = IERC20Detailed(A_USDC).balanceOf(user);
     uint256 aDAIBalanceAfter = IERC20Detailed(A_DAI).balanceOf(user);
-    assertEq(aBALBalanceAfter == 0, false);
-    assertApproxEqAbs(aBALBalanceAfter, 0, 0.00001 ether);
-    assertApproxEqAbs(aDAIBalanceAfter, amountOut, amountOut / 100);
+    assertEq(aUSDCBalanceAfter == 0, false);
+    assertApproxEqAbs(aUSDCBalanceAfter, 0, 0.00001 ether);
+    assertApproxEqAbs(aDAIBalanceAfter, destAmount, destAmount / 100);
+  }
+
+  function test_repayCollateral_leaveDust_noPermit() public {
+    uint256 supplyAmount = 200 ether;
+    uint256 borrowAmount = 5 ether;
+
+    _supply(supplyAmount, DAI);
+    _borrow(borrowAmount, USDC);
+
+    skip(100);
+    (
+      address augustus,
+      bytes memory swapCalldata,
+      uint256 srcAmount,
+
+    ) = _fetchPSPRoute(DAI, USDC, borrowAmount, user, false);
+    BaseParaSwapAdapter.PermitSignature memory signature;
+    IERC20Detailed(A_DAI).approve(address(repayAdapter), supplyAmount);
+    repayAdapter.swapAndRepay(
+      IERC20Detailed(DAI),
+      IERC20Detailed(USDC),
+      (srcAmount * 103) / 100,
+      borrowAmount,
+      2,
+      0,
+      swapCalldata,
+      signature
+    );
   }
 }
