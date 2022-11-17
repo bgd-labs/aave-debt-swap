@@ -22,14 +22,6 @@ import {IParaSwapAugustus} from './interfaces/IParaSwapAugustus.sol';
 contract ParaSwapRepayAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, Test {
   using SafeMath for uint256;
 
-  struct RepayParams {
-    address collateralAsset;
-    uint256 collateralAmount;
-    uint256 rateMode;
-    PermitSignature permitSignature;
-    bool useEthPath;
-  }
-
   constructor(
     IPoolAddressesProvider addressesProvider,
     IParaSwapAugustusRegistry augustusRegistry,
