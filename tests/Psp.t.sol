@@ -270,7 +270,7 @@ contract PspTest is Test {
    * 2. borrow 5 vUSDC
    * 3. swap debt to 5 vDAI
    */
-  function test_debtSwap_leaveDust_noPermit() public {
+  function test_debtSwap_noPermit() public {
     uint256 supplyAmount = 20000 ether;
     uint256 borrowAmount = 5000000;
 
@@ -278,24 +278,29 @@ contract PspTest is Test {
     _borrow(borrowAmount, USDC);
 
     skip(100);
+    uint256 amountWithMargin = (borrowAmount * 101) / 100;
     (
       address augustus,
       bytes memory swapCalldata,
       uint256 srcAmount,
       uint256 destAmount,
-
-    ) = _fetchPSPRoute(DAI, USDC, borrowAmount, user, false, false);
+      uint256 offset
+    ) = _fetchPSPRoute(DAI, USDC, amountWithMargin, user, false, true);
     BaseParaSwapAdapter.PermitSignature memory signature;
-    IERC20Detailed(A_DAI).approve(address(debtSwapAdapter), supplyAmount);
-    // repayAdapter.swapAndRepay(
-    //   IERC20Detailed(DAI),
-    //   IERC20Detailed(USDC),
-    //   srcAmount,
-    //   borrowAmount,
-    //   2,
-    //   0,
-    //   abi.encode(swapCalldata, augustus),
-    //   signature
-    // );
+    IERC20Detailed(A_DAI).approve(address(debtSwapAdapter), type(uint256).max);
+    bytes memory calldatas = abi.encode(
+      IERC20Detailed(USDC),
+      srcAmount,
+      offset,
+      2,
+      abi.encode(swapCalldata, augustus),
+      (signature)
+    );
+    _flash(address(debtSwapAdapter), srcAmount, DAI, 2, calldatas);
+
+    // uint256 aUSDCBalanceAfter = IERC20Detailed(A_USDC).balanceOf(user);
+    // uint256 aDAIBalanceAfter = IERC20Detailed(A_DAI).balanceOf(user);
+    // assertEq(aUSDCBalanceAfter, 0);
+    // assertGt(aDAIBalanceAfter, destAmount);
   }
 }

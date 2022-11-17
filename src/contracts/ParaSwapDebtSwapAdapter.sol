@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity ^0.8.10;
 
+import 'forge-std/Test.sol';
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol';
@@ -17,7 +18,11 @@ import {IParaSwapAugustus} from '../interfaces/IParaSwapAugustus.sol';
  * @notice ParaSwap Adapter to perform a repay of a debt with collateral.
  * @author BGD
  **/
-contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard {
+contract ParaSwapDebtSwapAdapter is
+  BaseParaSwapBuyAdapter,
+  ReentrancyGuard,
+  Test
+{
   using SafeMath for uint256;
 
   constructor(
@@ -45,122 +50,23 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard {
     uint256[] calldata premiums,
     address initiator,
     bytes calldata params
-  ) external returns (bool) {}
-
-  /**
-   * @dev Uses the received funds from the flash loan to repay a debt on the protocol on behalf of the user. Then pulls
-   * the collateral from the user and swaps it to the debt asset to repay the flash loan.
-   * The user should give this contract allowance to pull the ATokens in order to withdraw the underlying asset, swap it
-   * and repay the flash loan.
-   * Supports only one asset on the flash loan.
-   * @param asset The address of the flash-borrowed asset
-   * @param amount The amount of the flash-borrowed asset
-   * @param premium The fee of the flash-borrowed asset
-   * @param initiator The address of the flashloan initiator
-   * @param params The byte-encoded params passed when initiating the flashloan
-   * @return True if the execution of the operation succeeds, false otherwise
-   *   IERC20Detailed debtAsset Address of the debt asset
-   *   uint256 debtAmount Amount of debt to be repaid
-   *   uint256 rateMode Rate modes of the debt to be repaid
-   *   uint256 deadline Deadline for the permit signature
-   *   uint256 debtRateMode Rate mode of the debt to be repaid
-   *   bytes paraswapData Paraswap Data
-   *                    * bytes buyCallData Call data for augustus
-   *                    * IParaSwapAugustus augustus Address of Augustus Swapper
-   *   PermitSignature permitParams Struct containing the permit signatures, set to all zeroes if not used
-   */
-  function executeOperation(
-    address asset,
-    uint256 amount,
-    uint256 premium,
-    address initiator,
-    bytes calldata params
-  ) external nonReentrant returns (bool) {
+  ) external returns (bool) {
     require(msg.sender == address(POOL), 'CALLER_MUST_BE_POOL');
 
-    uint256 collateralAmount = amount;
+    uint256 newDebtAmount = amounts[0];
     address initiatorLocal = initiator;
 
-    IERC20Detailed collateralAsset = IERC20Detailed(asset);
+    IERC20Detailed newDebtAsset = IERC20Detailed(assets[0]);
 
     _swapAndRepay(
       params,
-      premium,
+      premiums[0],
       initiatorLocal,
-      collateralAsset,
-      collateralAmount
+      newDebtAsset,
+      newDebtAmount
     );
 
     return true;
-  }
-
-  /**
-   * @dev Swaps the user collateral for the debt asset and then repay the debt on the protocol on behalf of the user
-   * without using flash loans. This method can be used when the temporary transfer of the collateral asset to this
-   * contract does not affect the user position.
-   * The user should give this contract allowance to pull the ATokens in order to withdraw the underlying asset
-   * @param collateralAsset Address of asset to be swapped
-   * @param debtAsset Address of debt asset
-   * @param collateralAmount max Amount of the collateral to be swapped
-   * @param debtRepayAmount Amount of the debt to be repaid, or maximum amount when repaying entire debt
-   * @param debtRateMode Rate mode of the debt to be repaid
-   * @param buyAllBalanceOffset Set to offset of toAmount in Augustus calldata if wanting to pay entire debt, otherwise 0
-   * @param paraswapData Data for Paraswap Adapter
-   * @param permitSignature struct containing the permit signature
-   */
-  function swapAndRepay(
-    IERC20Detailed collateralAsset,
-    IERC20Detailed debtAsset,
-    uint256 collateralAmount,
-    uint256 debtRepayAmount,
-    uint256 debtRateMode,
-    uint256 buyAllBalanceOffset,
-    bytes calldata paraswapData,
-    PermitSignature calldata permitSignature
-  ) external nonReentrant {
-    debtRepayAmount = getDebtRepayAmount(
-      debtAsset,
-      debtRateMode,
-      buyAllBalanceOffset,
-      debtRepayAmount,
-      msg.sender
-    );
-
-    // Pull aTokens from user
-    _pullATokenAndWithdraw(
-      address(collateralAsset),
-      msg.sender,
-      collateralAmount,
-      permitSignature
-    );
-    //buy debt asset using collateral asset
-    uint256 amountSold = _buyOnParaSwap(
-      buyAllBalanceOffset,
-      paraswapData,
-      collateralAsset,
-      debtAsset,
-      collateralAmount,
-      debtRepayAmount
-    );
-
-    uint256 collateralBalanceLeft = collateralAmount - amountSold;
-
-    //deposit collateral back in the pool, if left after the swap(buy)
-    if (collateralBalanceLeft > 0) {
-      IERC20(collateralAsset).approve(address(POOL), 0);
-      IERC20(collateralAsset).approve(address(POOL), collateralBalanceLeft);
-      POOL.deposit(
-        address(collateralAsset),
-        collateralBalanceLeft,
-        msg.sender,
-        0
-      );
-    }
-
-    // Repay debt. Approves 0 first to comply with tokens that implement the anti frontrunning approval fix
-    IERC20(debtAsset).approve(address(POOL), 0);
-    IERC20(debtAsset).approve(address(POOL), debtRepayAmount);
-    POOL.repay(address(debtAsset), debtRepayAmount, debtRateMode, msg.sender);
   }
 
   /**
@@ -213,14 +119,6 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard {
     POOL.repay(address(debtAsset), debtRepayAmount, rateMode, initiator);
 
     uint256 neededForFlashLoanRepay = amountSold.add(premium);
-
-    // Pull aTokens from user
-    _pullATokenAndWithdraw(
-      address(collateralAsset),
-      initiator,
-      neededForFlashLoanRepay,
-      permitSignature
-    );
 
     // Repay flashloan. Approves for 0 first to comply with tokens that implement the anti frontrunning approval fix.
     IERC20(collateralAsset).approve(address(POOL), 0);
