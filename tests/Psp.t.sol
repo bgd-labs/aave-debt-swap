@@ -32,15 +32,17 @@ contract PspTest is Test {
   ParaSwapLiquiditySwapAdapter public lqSwapAdapter;
   ParaSwapRepayAdapter public repayAdapter;
 
-  address public constant USDC = 0xa3Fa99A148fA48D14Ed51d610c367C61876997F1;
-  address public constant A_USDC = 0xeBe517846d0F36eCEd99C735cbF6131e1fEB775D;
+  address public constant USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
+  address public constant A_USDC = 0x625E7708f30cA75bfd92586e17077590C60eb4cD;
   address public constant DAI = 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063;
   address public constant A_DAI = 0x82E64f49Ed5EC1bC6e43DAD4FC8Af9bb3A2312EE;
 
   address public user;
 
+  uint256 constant MAX_SLIPPAGE = 3;
+
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl('polygon'), 35686387);
+    vm.createSelectFork(vm.rpcUrl('polygon'), 35724579);
     lqSwapAdapter = new ParaSwapLiquiditySwapAdapter(
       IPoolAddressesProvider(address(AaveV3Polygon.POOL_ADDRESSES_PROVIDER)),
       AugustusRegistry.POLYGON,
@@ -61,9 +63,10 @@ contract PspTest is Test {
     address to,
     uint256 amount,
     address userAddress,
-    bool sell
+    bool sell,
+    bool max
   ) internal returns (address, bytes memory, uint256, uint256) {
-    string[] memory inputs = new string[](8);
+    string[] memory inputs = new string[](12);
     inputs[0] = 'node';
     inputs[1] = './scripts/psp.js';
     inputs[2] = vm.toString(block.chainid);
@@ -72,6 +75,10 @@ contract PspTest is Test {
     inputs[5] = vm.toString(amount);
     inputs[6] = vm.toString(userAddress);
     inputs[7] = sell ? 'SELL' : 'BUY';
+    inputs[8] = vm.toString(MAX_SLIPPAGE);
+    inputs[9] = vm.toString(max);
+    inputs[10] = vm.toString(IERC20Detailed(from).decimals());
+    inputs[11] = vm.toString(IERC20Detailed(to).decimals());
     bytes memory res = vm.ffi(inputs);
     return abi.decode(res, (address, bytes, uint256, uint256));
   }
@@ -87,16 +94,16 @@ contract PspTest is Test {
   }
 
   function test_swapCollateral_leaveDust_noPermit() public {
-    uint256 amount = 10 ether;
+    uint256 amount = 600000000;
     _supply(amount, USDC);
 
     skip(100);
     (
       address augustus,
       bytes memory swapCalldata,
-      ,
+      uint256 srcAmount,
       uint256 destAmount
-    ) = _fetchPSPRoute(USDC, DAI, amount, user, true);
+    ) = _fetchPSPRoute(USDC, DAI, amount, user, true, false);
     BaseParaSwapAdapter.PermitSignature memory signature;
 
     IERC20Detailed(A_USDC).approve(address(lqSwapAdapter), amount);
@@ -104,7 +111,7 @@ contract PspTest is Test {
       IERC20Detailed(USDC),
       IERC20Detailed(DAI),
       amount,
-      (destAmount * 98) / 100, // 1% slippage
+      destAmount,
       0,
       swapCalldata,
       IParaSwapAugustus(augustus),
@@ -114,13 +121,13 @@ contract PspTest is Test {
     uint256 aUSDCBalanceAfter = IERC20Detailed(A_USDC).balanceOf(user);
     uint256 aDAIBalanceAfter = IERC20Detailed(A_DAI).balanceOf(user);
     assertEq(aUSDCBalanceAfter == 0, false);
-    assertApproxEqAbs(aUSDCBalanceAfter, 0, 0.00001 ether);
-    assertApproxEqAbs(aDAIBalanceAfter, destAmount, destAmount / 100);
+    assertApproxEqAbs(aUSDCBalanceAfter, 0, 100);
+    assertGt(aDAIBalanceAfter, destAmount);
   }
 
   function test_repayCollateral_leaveDust_noPermit() public {
-    uint256 supplyAmount = 200 ether;
-    uint256 borrowAmount = 5 ether;
+    uint256 supplyAmount = 20000 ether;
+    uint256 borrowAmount = 5000000;
 
     _supply(supplyAmount, DAI);
     _borrow(borrowAmount, USDC);
@@ -130,18 +137,18 @@ contract PspTest is Test {
       address augustus,
       bytes memory swapCalldata,
       uint256 srcAmount,
-
-    ) = _fetchPSPRoute(DAI, USDC, borrowAmount, user, false);
+      uint256 destAmount
+    ) = _fetchPSPRoute(DAI, USDC, borrowAmount, user, false, false);
     BaseParaSwapAdapter.PermitSignature memory signature;
     IERC20Detailed(A_DAI).approve(address(repayAdapter), supplyAmount);
     repayAdapter.swapAndRepay(
       IERC20Detailed(DAI),
       IERC20Detailed(USDC),
-      (srcAmount * 103) / 100,
+      srcAmount,
       borrowAmount,
       2,
       0,
-      swapCalldata,
+      abi.encode(swapCalldata, augustus),
       signature
     );
   }
