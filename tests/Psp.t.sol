@@ -7,8 +7,8 @@ import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAd
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {ParaSwapLiquiditySwapAdapter} from '../src/contracts/ParaSwapLiquiditySwapAdapter.sol';
 import {ParaSwapRepayAdapter} from '../src/contracts/ParaSwapRepayAdapter.sol';
-import {IParaSwapAugustus} from '../src/contracts/interfaces/IParaSwapAugustus.sol';
-import {IParaSwapAugustusRegistry} from '../src/contracts/interfaces/IParaSwapAugustusRegistry.sol';
+import {IParaSwapAugustus} from '../src/interfaces/IParaSwapAugustus.sol';
+import {IParaSwapAugustusRegistry} from '../src/interfaces/IParaSwapAugustusRegistry.sol';
 import {BaseParaSwapAdapter} from '../src/contracts/BaseParaSwapAdapter.sol';
 
 library AugustusRegistry {
@@ -65,7 +65,7 @@ contract PspTest is Test {
     address userAddress,
     bool sell,
     bool max
-  ) internal returns (address, bytes memory, uint256, uint256) {
+  ) internal returns (address, bytes memory, uint256, uint256, bytes4) {
     string[] memory inputs = new string[](12);
     inputs[0] = 'node';
     inputs[1] = './scripts/psp.js';
@@ -80,7 +80,7 @@ contract PspTest is Test {
     inputs[10] = vm.toString(IERC20Detailed(from).decimals());
     inputs[11] = vm.toString(IERC20Detailed(to).decimals());
     bytes memory res = vm.ffi(inputs);
-    return abi.decode(res, (address, bytes, uint256, uint256));
+    return abi.decode(res, (address, bytes, uint256, uint256, bytes4));
   }
 
   function _supply(uint256 amount, address asset) internal {
@@ -102,7 +102,8 @@ contract PspTest is Test {
       address augustus,
       bytes memory swapCalldata,
       uint256 srcAmount,
-      uint256 destAmount
+      uint256 destAmount,
+
     ) = _fetchPSPRoute(USDC, DAI, amount, user, true, false);
     BaseParaSwapAdapter.PermitSignature memory signature;
 
@@ -137,7 +138,8 @@ contract PspTest is Test {
       address augustus,
       bytes memory swapCalldata,
       uint256 srcAmount,
-      uint256 destAmount
+      uint256 destAmount,
+
     ) = _fetchPSPRoute(DAI, USDC, borrowAmount, user, false, false);
     BaseParaSwapAdapter.PermitSignature memory signature;
     IERC20Detailed(A_DAI).approve(address(repayAdapter), supplyAmount);

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.10;
 
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
-import {FlashLoanSimpleReceiverBase} from '@aave/core-v3/contracts/flashloan/base/FlashLoanSimpleReceiverBase.sol';
 import {GPv2SafeERC20} from '@aave/core-v3/contracts/dependencies/gnosis/contracts/GPv2SafeERC20.sol';
 import {IERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
@@ -11,13 +10,14 @@ import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAd
 import {IPriceOracleGetter} from '@aave/core-v3/contracts/interfaces/IPriceOracleGetter.sol';
 import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeMath.sol';
 import {Ownable} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/Ownable.sol';
+import {ReducedFlashLoanReceiverBase} from './ReducedFlashLoanReceiverBase.sol';
 
 /**
  * @title BaseParaSwapAdapter
  * @notice Utility functions for adapters using ParaSwap
  * @author Jason Raymond Bell
  */
-abstract contract BaseParaSwapAdapter is FlashLoanSimpleReceiverBase, Ownable {
+abstract contract BaseParaSwapAdapter is ReducedFlashLoanReceiverBase, Ownable {
   using SafeMath for uint256;
   using GPv2SafeERC20 for IERC20;
   using GPv2SafeERC20 for IERC20Detailed;
@@ -51,7 +51,7 @@ abstract contract BaseParaSwapAdapter is FlashLoanSimpleReceiverBase, Ownable {
 
   constructor(
     IPoolAddressesProvider addressesProvider
-  ) FlashLoanSimpleReceiverBase(addressesProvider) {
+  ) ReducedFlashLoanReceiverBase(addressesProvider) {
     ORACLE = IPriceOracleGetter(addressesProvider.getPriceOracle());
   }
 

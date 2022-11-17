@@ -7,8 +7,8 @@ import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAd
 import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeMath.sol';
 import {ReentrancyGuard} from 'aave-v3-periphery/contracts/dependencies/openzeppelin/ReentrancyGuard.sol';
 import {BaseParaSwapSellAdapter} from './BaseParaSwapSellAdapter.sol';
-import {IParaSwapAugustusRegistry} from './interfaces/IParaSwapAugustusRegistry.sol';
-import {IParaSwapAugustus} from './interfaces/IParaSwapAugustus.sol';
+import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry.sol';
+import {IParaSwapAugustus} from '../interfaces/IParaSwapAugustus.sol';
 
 /**
  * @title ParaSwapLiquiditySwapAdapter
@@ -52,7 +52,7 @@ contract ParaSwapLiquiditySwapAdapter is
     uint256 premium,
     address initiator,
     bytes calldata params
-  ) external override nonReentrant returns (bool) {
+  ) external nonReentrant returns (bool) {
     require(msg.sender == address(POOL), 'CALLER_MUST_BE_POOL');
 
     uint256 flashLoanAmount = amount;
