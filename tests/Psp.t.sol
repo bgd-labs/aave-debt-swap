@@ -7,6 +7,7 @@ import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAd
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {ParaSwapLiquiditySwapAdapter} from '../src/contracts/ParaSwapLiquiditySwapAdapter.sol';
 import {ParaSwapRepayAdapter} from '../src/contracts/ParaSwapRepayAdapter.sol';
+import {ParaSwapDebtSwapAdapter} from '../src/contracts/ParaSwapDebtSwapAdapter.sol';
 import {IParaSwapAugustus} from '../src/interfaces/IParaSwapAugustus.sol';
 import {IParaSwapAugustusRegistry} from '../src/interfaces/IParaSwapAugustusRegistry.sol';
 import {BaseParaSwapAdapter} from '../src/contracts/BaseParaSwapAdapter.sol';
@@ -31,6 +32,7 @@ library AugustusRegistry {
 contract PspTest is Test {
   ParaSwapLiquiditySwapAdapter public lqSwapAdapter;
   ParaSwapRepayAdapter public repayAdapter;
+  ParaSwapDebtSwapAdapter public debtSwapAdapter;
 
   address public constant USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
   address public constant A_USDC = 0x625E7708f30cA75bfd92586e17077590C60eb4cD;
@@ -53,6 +55,11 @@ contract PspTest is Test {
       AugustusRegistry.POLYGON,
       AaveV3Polygon.ACL_ADMIN
     );
+    debtSwapAdapter = new ParaSwapDebtSwapAdapter(
+      IPoolAddressesProvider(address(AaveV3Polygon.POOL_ADDRESSES_PROVIDER)),
+      AugustusRegistry.POLYGON,
+      AaveV3Polygon.ACL_ADMIN
+    );
 
     user = address(this);
     vm.startPrank(user);
@@ -65,7 +72,7 @@ contract PspTest is Test {
     address userAddress,
     bool sell,
     bool max
-  ) internal returns (address, bytes memory, uint256, uint256, bytes4) {
+  ) internal returns (address, bytes memory, uint256, uint256, uint256) {
     string[] memory inputs = new string[](12);
     inputs[0] = 'node';
     inputs[1] = './scripts/psp.js';
@@ -80,7 +87,7 @@ contract PspTest is Test {
     inputs[10] = vm.toString(IERC20Detailed(from).decimals());
     inputs[11] = vm.toString(IERC20Detailed(to).decimals());
     bytes memory res = vm.ffi(inputs);
-    return abi.decode(res, (address, bytes, uint256, uint256, bytes4));
+    return abi.decode(res, (address, bytes, uint256, uint256, uint256));
   }
 
   function _supply(uint256 amount, address asset) internal {
@@ -91,6 +98,39 @@ contract PspTest is Test {
 
   function _borrow(uint256 amount, address asset) internal {
     AaveV3Polygon.POOL.borrow(asset, amount, 2, 0, user);
+  }
+
+  function _flashSimple(
+    address receiver,
+    uint256 amount,
+    address asset,
+    bytes memory calldatas
+  ) internal {
+    AaveV3Polygon.POOL.flashLoanSimple(receiver, asset, amount, calldatas, 0);
+  }
+
+  function _flash(
+    address receiver,
+    uint256 amount,
+    address asset,
+    uint256 interestRateMode,
+    bytes memory calldatas
+  ) internal {
+    address[] memory assets = new address[](1);
+    assets[0] = asset;
+    uint256[] memory amounts = new uint256[](1);
+    amounts[0] = amount;
+    uint256[] memory interestRateModes = new uint256[](1);
+    interestRateModes[0] = interestRateMode;
+    AaveV3Polygon.POOL.flashLoan(
+      receiver,
+      assets,
+      amounts,
+      interestRateModes,
+      user,
+      calldatas,
+      0
+    );
   }
 
   function test_swapCollateral_leaveDust_noPermit() public {
@@ -126,6 +166,76 @@ contract PspTest is Test {
     assertGt(aDAIBalanceAfter, destAmount);
   }
 
+  function test_swapCollateral_noPermit() public {
+    uint256 amount = 600000000;
+    _supply(amount, USDC);
+
+    skip(100);
+    uint256 amountWithMargin = (amount * 101) / 100;
+    (
+      address augustus,
+      bytes memory swapCalldata,
+      uint256 srcAmount,
+      uint256 destAmount,
+      uint256 offset
+    ) = _fetchPSPRoute(USDC, DAI, amountWithMargin, user, true, true);
+    BaseParaSwapAdapter.PermitSignature memory signature;
+
+    IERC20Detailed(A_USDC).approve(address(lqSwapAdapter), type(uint256).max);
+    lqSwapAdapter.swapAndDeposit(
+      IERC20Detailed(USDC),
+      IERC20Detailed(DAI),
+      amountWithMargin,
+      destAmount,
+      offset,
+      swapCalldata,
+      IParaSwapAugustus(augustus),
+      signature
+    );
+
+    uint256 aUSDCBalanceAfter = IERC20Detailed(A_USDC).balanceOf(user);
+    uint256 aDAIBalanceAfter = IERC20Detailed(A_DAI).balanceOf(user);
+    assertEq(aUSDCBalanceAfter, 0);
+    assertGt(aDAIBalanceAfter, destAmount);
+  }
+
+  function test_swapCollateral_noPermit_flashloan() public {
+    uint256 amount = 600000000;
+    _supply(amount, USDC);
+
+    skip(100);
+    uint256 amountWithMargin = (amount * 101) / 100;
+    (
+      address augustus,
+      bytes memory swapCalldata,
+      uint256 srcAmount,
+      uint256 destAmount,
+      uint256 offset
+    ) = _fetchPSPRoute(USDC, DAI, amountWithMargin, user, true, true);
+    BaseParaSwapAdapter.PermitSignature memory signature;
+
+    IERC20Detailed(A_USDC).approve(address(lqSwapAdapter), type(uint256).max);
+    bytes memory calldatas = abi.encode(
+      IERC20Detailed(DAI),
+      destAmount,
+      offset,
+      swapCalldata,
+      IParaSwapAugustus(augustus),
+      (signature)
+    );
+    _flashSimple(
+      address(lqSwapAdapter),
+      (amountWithMargin * 101) / 100,
+      USDC,
+      calldatas
+    );
+
+    uint256 aUSDCBalanceAfter = IERC20Detailed(A_USDC).balanceOf(user);
+    uint256 aDAIBalanceAfter = IERC20Detailed(A_DAI).balanceOf(user);
+    assertEq(aUSDCBalanceAfter, 0);
+    assertGt(aDAIBalanceAfter, destAmount);
+  }
+
   function test_repayCollateral_leaveDust_noPermit() public {
     uint256 supplyAmount = 20000 ether;
     uint256 borrowAmount = 5000000;
@@ -153,5 +263,39 @@ contract PspTest is Test {
       abi.encode(swapCalldata, augustus),
       signature
     );
+  }
+
+  /**
+   * 1. supply 20000 DAI
+   * 2. borrow 5 vUSDC
+   * 3. swap debt to 5 vDAI
+   */
+  function test_debtSwap_leaveDust_noPermit() public {
+    uint256 supplyAmount = 20000 ether;
+    uint256 borrowAmount = 5000000;
+
+    _supply(supplyAmount, DAI);
+    _borrow(borrowAmount, USDC);
+
+    skip(100);
+    (
+      address augustus,
+      bytes memory swapCalldata,
+      uint256 srcAmount,
+      uint256 destAmount,
+
+    ) = _fetchPSPRoute(DAI, USDC, borrowAmount, user, false, false);
+    BaseParaSwapAdapter.PermitSignature memory signature;
+    IERC20Detailed(A_DAI).approve(address(debtSwapAdapter), supplyAmount);
+    // repayAdapter.swapAndRepay(
+    //   IERC20Detailed(DAI),
+    //   IERC20Detailed(USDC),
+    //   srcAmount,
+    //   borrowAmount,
+    //   2,
+    //   0,
+    //   abi.encode(swapCalldata, augustus),
+    //   signature
+    // );
   }
 }

@@ -1,4 +1,8 @@
-const { constructSimpleSDK, SwapSide } = require("@paraswap/sdk");
+const {
+  constructSimpleSDK,
+  SwapSide,
+  ContractMethod,
+} = require("@paraswap/sdk");
 const axios = require("axios");
 const { BigNumber } = require("ethers");
 const { defaultAbiCoder } = require("ethers/lib/utils");
@@ -64,6 +68,8 @@ const augustusToAmountOffsetFromCalldata = (calldata) => {
 };
 
 async function main(from, to, method, amount, user) {
+  const excludedMethod =
+    method === "SELL" ? ContractMethod.simpleSwap : ContractMethod.simpleBuy;
   const priceRoute = await paraSwapMin.swap.getRate({
     srcToken: from,
     srcDecimals: FROM_DECIMALS,
@@ -71,6 +77,13 @@ async function main(from, to, method, amount, user) {
     destDecimals: TO_DECIMALS,
     amount: amount,
     side: method,
+    ...(MAX
+      ? {
+          options: {
+            excludeContractMethods: [excludedMethod],
+          },
+        }
+      : {}),
   });
 
   const srcAmount =
@@ -106,10 +119,10 @@ async function main(from, to, method, amount, user) {
     ? method === "SELL"
       ? augustusFromAmountOffsetFromCalldata(txParams.data)
       : augustusToAmountOffsetFromCalldata(txParams.data)
-    : "0x00000000";
+    : 0;
 
   const encodedData = defaultAbiCoder.encode(
-    ["address", "bytes", "uint256", "uint256", "bytes4"],
+    ["address", "bytes", "uint256", "uint256", "uint256"],
     [txParams.to, txParams.data, srcAmount, destAmount, offset]
   );
 

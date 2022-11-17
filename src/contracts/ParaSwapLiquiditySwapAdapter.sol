@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity ^0.8.10;
 
+import 'forge-std/Test.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IERC20WithPermit} from '@aave/core-v3/contracts/interfaces/IERC20WithPermit.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
@@ -17,7 +18,8 @@ import {IParaSwapAugustus} from '../interfaces/IParaSwapAugustus.sol';
  */
 contract ParaSwapLiquiditySwapAdapter is
   BaseParaSwapSellAdapter,
-  ReentrancyGuard
+  ReentrancyGuard,
+  Test
 {
   using SafeMath for uint256;
 
