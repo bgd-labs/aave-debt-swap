@@ -122,8 +122,8 @@ async function main(from, to, method, amount, user) {
     : 0;
 
   const encodedData = defaultAbiCoder.encode(
-    ["address", "bytes", "uint256", "uint256", "uint256"],
-    [txParams.to, txParams.data, srcAmount, destAmount, offset]
+    ["(address,bytes,uint256,uint256,uint256)"],
+    [[txParams.to, txParams.data, srcAmount, destAmount, offset]]
   );
 
   process.stdout.write(encodedData);

@@ -15,7 +15,7 @@ import {IFlashLoanReceiver} from '../interfaces/IFlashLoanReceiver.sol';
 
 /**
  * @title ParaSwapDebtSwapAdapter
- * @notice ParaSwap Adapter to perform a repay of a debt with collateral.
+ * @notice ParaSwap Adapter to perform a swap of debt for anotehr debt.
  * @author BGD
  **/
 contract ParaSwapDebtSwapAdapter is
@@ -73,28 +73,24 @@ contract ParaSwapDebtSwapAdapter is
    * @dev Perform the repay of the debt, pulls the initiator collateral and swaps to repay the flash loan
    * @param premium Fee of the flash loan
    * @param initiator Address of the user
-   * @param collateralAsset Address of token to be swapped
-   * @param collateralAmount Amount of the reserve to be swapped(flash loan amount)
+   * @param newDebtAsset Address of token to be swapped
+   * @param newDebtAmount Amount of the reserve to be swapped(flash loan amount)
    */
 
   function _swapAndRepay(
     bytes calldata params,
     uint256 premium,
     address initiator,
-    IERC20Detailed collateralAsset,
-    uint256 collateralAmount
+    IERC20Detailed newDebtAsset,
+    uint256 newDebtAmount
   ) private {
     (
       IERC20Detailed debtAsset,
       uint256 debtRepayAmount,
       uint256 buyAllBalanceOffset,
       uint256 rateMode,
-      bytes memory paraswapData,
-      PermitSignature memory permitSignature
-    ) = abi.decode(
-        params,
-        (IERC20Detailed, uint256, uint256, uint256, bytes, PermitSignature)
-      );
+      bytes memory paraswapData
+    ) = abi.decode(params, (IERC20Detailed, uint256, uint256, uint256, bytes));
 
     debtRepayAmount = getDebtRepayAmount(
       debtAsset,
@@ -107,9 +103,9 @@ contract ParaSwapDebtSwapAdapter is
     uint256 amountSold = _buyOnParaSwap(
       buyAllBalanceOffset,
       paraswapData,
-      collateralAsset,
+      newDebtAsset,
       debtAsset,
-      collateralAmount,
+      newDebtAmount,
       debtRepayAmount
     );
 
@@ -119,11 +115,8 @@ contract ParaSwapDebtSwapAdapter is
     POOL.repay(address(debtAsset), debtRepayAmount, rateMode, initiator);
 
     // Repay flashloan with dust. Approves for 0 first to comply with tokens that implement the anti frontrunning approval fix.
-    IERC20(collateralAsset).approve(address(POOL), 0);
-    IERC20(collateralAsset).approve(
-      address(POOL),
-      collateralAmount.add(premium)
-    );
+    IERC20(newDebtAsset).approve(address(POOL), 0);
+    IERC20(newDebtAsset).approve(address(POOL), newDebtAmount.add(premium));
   }
 
   function getDebtRepayAmount(
