@@ -6,32 +6,13 @@ import {AaveV3Polygon} from 'aave-address-book/AaveV3Polygon.sol';
 import {DataTypes} from 'aave-address-book/AaveV3.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
-import {IERC20WithPermit} from '@aave/core-v3/contracts/interfaces/IERC20WithPermit.sol';
-import {IAToken} from '@aave/core-v3/contracts/interfaces/IAToken.sol';
 import {ParaSwapLiquiditySwapAdapter} from '../src/contracts/ParaSwapLiquiditySwapAdapter.sol';
 import {ParaSwapRepayAdapter} from '../src/contracts/ParaSwapRepayAdapter.sol';
 import {ParaSwapDebtSwapAdapter} from '../src/contracts/ParaSwapDebtSwapAdapter.sol';
 import {IParaSwapAugustus} from '../src/interfaces/IParaSwapAugustus.sol';
-import {IParaSwapAugustusRegistry} from '../src/interfaces/IParaSwapAugustusRegistry.sol';
 import {BaseParaSwapAdapter} from '../src/contracts/BaseParaSwapAdapter.sol';
+import {AugustusRegistry} from '../src/lib/AugustusRegistry.sol';
 import {SigUtils} from './utils/SigUtils.sol';
-
-library AugustusRegistry {
-  IParaSwapAugustusRegistry public constant ETHEREUM =
-    IParaSwapAugustusRegistry(0xa68bEA62Dc4034A689AA0F58A76681433caCa663);
-
-  IParaSwapAugustusRegistry public constant POLYGON =
-    IParaSwapAugustusRegistry(0xca35a4866747Ff7A604EF7a2A7F246bb870f3ca1);
-
-  IParaSwapAugustusRegistry public constant AVALANCHE =
-    IParaSwapAugustusRegistry(0xfD1E5821F07F1aF812bB7F3102Bfd9fFb279513a);
-
-  IParaSwapAugustusRegistry public constant ARBITRUM =
-    IParaSwapAugustusRegistry(0xdC6E2b14260F972ad4e5a31c68294Fba7E720701);
-
-  IParaSwapAugustusRegistry public constant OPTIMISM =
-    IParaSwapAugustusRegistry(0x6e7bE86000dF697facF4396efD2aE2C322165dC3);
-}
 
 contract PspTest is Test {
   struct PsPResponse {
@@ -282,138 +263,138 @@ contract PspTest is Test {
     assertGt(aDEST_TOKENBalanceAfter, psp.destAmount);
   }
 
-  // function test_swapCollateral_noPermit_flashloan() public {
-  //   uint256 amount = 600000000;
-  //   _supply(amount, SRC_TOKEN);
+  function test_swapCollateral_noPermit_flashloan() public {
+    uint256 amount = 600000000;
+    _supply(amount, SRC_TOKEN);
 
-  //   skip(100);
-  //   uint256 amountWithMargin = (amount * 101) / 100;
-  //   (
-  //     address augustus,
-  //     bytes memory swapCalldata,
-  //     uint256 srcAmount,
-  //     uint256 destAmount,
-  //     uint256 offset
-  //   ) = _fetchPSPRoute(
-  //       SRC_TOKEN,
-  //       DEST_TOKEN,
-  //       amountWithMargin,
-  //       user,
-  //       true,
-  //       true
-  //     );
-  //   BaseParaSwapAdapter.PermitSignature memory signature;
+    skip(100);
+    uint256 amountWithMargin = (amount * 101) / 100;
+    (
+      address augustus,
+      bytes memory swapCalldata,
+      uint256 srcAmount,
+      uint256 destAmount,
+      uint256 offset
+    ) = _fetchPSPRoute(
+        SRC_TOKEN,
+        DEST_TOKEN,
+        amountWithMargin,
+        user,
+        true,
+        true
+      );
+    BaseParaSwapAdapter.PermitSignature memory signature;
 
-  //   IERC20Detailed(srcReserveData.aTokenAddress).approve(
-  //     address(lqSwapAdapter),
-  //     type(uint256).max
-  //   );
-  //   bytes memory calldatas = abi.encode(
-  //     IERC20Detailed(DEST_TOKEN),
-  //     destAmount,
-  //     offset,
-  //     swapCalldata,
-  //     IParaSwapAugustus(augustus),
-  //     (signature)
-  //   );
-  //   _flashSimple(
-  //     address(lqSwapAdapter),
-  //     (amountWithMargin * 101) / 100,
-  //     SRC_TOKEN,
-  //     calldatas
-  //   );
+    IERC20Detailed(srcReserveData.aTokenAddress).approve(
+      address(lqSwapAdapter),
+      type(uint256).max
+    );
+    bytes memory calldatas = abi.encode(
+      IERC20Detailed(DEST_TOKEN),
+      destAmount,
+      offset,
+      swapCalldata,
+      IParaSwapAugustus(augustus),
+      (signature)
+    );
+    _flashSimple(
+      address(lqSwapAdapter),
+      (amountWithMargin * 101) / 100,
+      SRC_TOKEN,
+      calldatas
+    );
 
-  //   uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(
-  //     srcReserveData.aTokenAddress
-  //   ).balanceOf(user);
-  //   uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(
-  //     destReserveData.aTokenAddress
-  //   ).balanceOf(user);
-  //   assertEq(aSRC_TOKENBalanceAfter, 0);
-  //   assertGt(aDEST_TOKENBalanceAfter, destAmount);
-  // }
+    uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(
+      srcReserveData.aTokenAddress
+    ).balanceOf(user);
+    uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(
+      destReserveData.aTokenAddress
+    ).balanceOf(user);
+    assertEq(aSRC_TOKENBalanceAfter, 0);
+    assertGt(aDEST_TOKENBalanceAfter, destAmount);
+  }
 
-  // function test_repayCollateral_leaveDust_noPermit() public {
-  //   uint256 supplyAmount = 20000 ether;
-  //   uint256 borrowAmount = 5000000;
+  function test_repayCollateral_leaveDust_noPermit() public {
+    uint256 supplyAmount = 20000 ether;
+    uint256 borrowAmount = 5000000;
 
-  //   _supply(supplyAmount, DEST_TOKEN);
-  //   _borrow(borrowAmount, SRC_TOKEN);
+    _supply(supplyAmount, DEST_TOKEN);
+    _borrow(borrowAmount, SRC_TOKEN);
 
-  //   skip(100);
-  //   (
-  //     address augustus,
-  //     bytes memory swapCalldata,
-  //     uint256 srcAmount,
-  //     uint256 destAmount,
+    skip(100);
+    (
+      address augustus,
+      bytes memory swapCalldata,
+      uint256 srcAmount,
+      uint256 destAmount,
 
-  //   ) = _fetchPSPRoute(DEST_TOKEN, SRC_TOKEN, borrowAmount, user, false, false);
-  //   BaseParaSwapAdapter.PermitSignature memory signature;
-  //   IERC20Detailed(destReserveData.aTokenAddress).approve(
-  //     address(repayAdapter),
-  //     supplyAmount
-  //   );
-  //   repayAdapter.swapAndRepay(
-  //     IERC20Detailed(DEST_TOKEN),
-  //     IERC20Detailed(SRC_TOKEN),
-  //     srcAmount,
-  //     borrowAmount,
-  //     2,
-  //     0,
-  //     abi.encode(swapCalldata, augustus),
-  //     signature
-  //   );
-  // }
+    ) = _fetchPSPRoute(DEST_TOKEN, SRC_TOKEN, borrowAmount, user, false, false);
+    BaseParaSwapAdapter.PermitSignature memory signature;
+    IERC20Detailed(destReserveData.aTokenAddress).approve(
+      address(repayAdapter),
+      supplyAmount
+    );
+    repayAdapter.swapAndRepay(
+      IERC20Detailed(DEST_TOKEN),
+      IERC20Detailed(SRC_TOKEN),
+      srcAmount,
+      borrowAmount,
+      2,
+      0,
+      abi.encode(swapCalldata, augustus),
+      signature
+    );
+  }
 
-  // /**
-  //  * 1. supply 20000 DEST_TOKEN
-  //  * 2. borrow 5 vSRC_TOKEN
-  //  * 3. swap debt to 5 vDEST_TOKEN
-  //  */
-  // function test_debtSwap_noPermit() public {
-  //   uint256 supplyAmount = 20000 ether;
-  //   uint256 borrowAmount = 5000000;
+  /**
+   * 1. supply 20000 DEST_TOKEN
+   * 2. borrow 5 vSRC_TOKEN
+   * 3. swap debt to 5 vDEST_TOKEN
+   */
+  function test_debtSwap_noPermit() public {
+    uint256 supplyAmount = 20000 ether;
+    uint256 borrowAmount = 5000000;
 
-  //   _supply(supplyAmount, DEST_TOKEN);
-  //   _borrow(borrowAmount, SRC_TOKEN);
+    _supply(supplyAmount, DEST_TOKEN);
+    _borrow(borrowAmount, SRC_TOKEN);
 
-  //   // forward time to accumulate some debt
-  //   skip(100);
+    // forward time to accumulate some debt
+    skip(100);
 
-  //   // add some margin to account for accumulated debt
-  //   uint256 amountWithMargin = (borrowAmount * 101) / 100;
-  //   (
-  //     address augustus,
-  //     bytes memory swapCalldata,
-  //     uint256 srcAmount,
-  //     uint256 destAmount,
-  //     uint256 offset
-  //   ) = _fetchPSPRoute(
-  //       DEST_TOKEN,
-  //       SRC_TOKEN,
-  //       amountWithMargin,
-  //       user,
-  //       false,
-  //       true
-  //     );
+    // add some margin to account for accumulated debt
+    uint256 amountWithMargin = (borrowAmount * 101) / 100;
+    (
+      address augustus,
+      bytes memory swapCalldata,
+      uint256 srcAmount,
+      uint256 destAmount,
+      uint256 offset
+    ) = _fetchPSPRoute(
+        DEST_TOKEN,
+        SRC_TOKEN,
+        amountWithMargin,
+        user,
+        false,
+        true
+      );
 
-  //   // execute flashloan
-  //   bytes memory calldatas = abi.encode(
-  //     IERC20Detailed(SRC_TOKEN),
-  //     srcAmount,
-  //     offset,
-  //     2,
-  //     abi.encode(swapCalldata, augustus)
-  //   );
-  //   _flash(address(debtSwapAdapter), srcAmount, DEST_TOKEN, 2, calldatas);
+    // execute flashloan
+    bytes memory calldatas = abi.encode(
+      IERC20Detailed(SRC_TOKEN),
+      srcAmount,
+      offset,
+      2,
+      abi.encode(swapCalldata, augustus)
+    );
+    _flash(address(debtSwapAdapter), srcAmount, DEST_TOKEN, 2, calldatas);
 
-  //   uint256 vSRC_TOKENBalanceAfter = IERC20Detailed(
-  //     srcReserveData.variableDebtTokenAddress
-  //   ).balanceOf(user);
-  //   uint256 vDEST_TOKENBalanceAfter = IERC20Detailed(
-  //     destReserveData.variableDebtTokenAddress
-  //   ).balanceOf(user);
-  //   assertEq(vSRC_TOKENBalanceAfter, 0);
-  //   assertEq(vDEST_TOKENBalanceAfter, srcAmount);
-  // }
+    uint256 vSRC_TOKENBalanceAfter = IERC20Detailed(
+      srcReserveData.variableDebtTokenAddress
+    ).balanceOf(user);
+    uint256 vDEST_TOKENBalanceAfter = IERC20Detailed(
+      destReserveData.variableDebtTokenAddress
+    ).balanceOf(user);
+    assertEq(vSRC_TOKENBalanceAfter, 0);
+    assertEq(vDEST_TOKENBalanceAfter, srcAmount);
+  }
 }

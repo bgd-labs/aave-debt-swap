@@ -26,6 +26,7 @@ library SigUtils {
     return
       keccak256(
         abi.encode(
+          PERMIT_TYPEHASH,
           _permit.owner,
           _permit.spender,
           _permit.value,
