@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity ^0.8.10;
 
-import 'forge-std/Test.sol';
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol';
@@ -22,8 +21,7 @@ import {IFlashLoanReceiver} from '../interfaces/IFlashLoanReceiver.sol';
 contract ParaSwapDebtSwapAdapter is
   BaseParaSwapBuyAdapter,
   ReentrancyGuard,
-  IFlashLoanReceiver,
-  Test
+  IFlashLoanReceiver
 {
   using SafeMath for uint256;
 
@@ -120,9 +118,7 @@ contract ParaSwapDebtSwapAdapter is
     IERC20(debtAsset).approve(address(POOL), debtRepayAmount);
     POOL.repay(address(debtAsset), debtRepayAmount, rateMode, initiator);
 
-    uint256 neededForFlashLoanRepay = amountSold.add(premium);
-
-    // Repay flashloan. Approves for 0 first to comply with tokens that implement the anti frontrunning approval fix.
+    // Repay flashloan with dust. Approves for 0 first to comply with tokens that implement the anti frontrunning approval fix.
     IERC20(collateralAsset).approve(address(POOL), 0);
     IERC20(collateralAsset).approve(
       address(POOL),
