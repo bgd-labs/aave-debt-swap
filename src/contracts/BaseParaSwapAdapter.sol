@@ -7,17 +7,18 @@ import {IERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contract
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IERC20WithPermit} from '@aave/core-v3/contracts/interfaces/IERC20WithPermit.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
+import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
 import {IPriceOracleGetter} from '@aave/core-v3/contracts/interfaces/IPriceOracleGetter.sol';
 import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeMath.sol';
 import {Ownable} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/Ownable.sol';
-import {ReducedFlashLoanReceiverBase} from './ReducedFlashLoanReceiverBase.sol';
+import {IFlashLoanReceiverBase} from '../interfaces/IFlashLoanReceiverBase.sol';
 
 /**
  * @title BaseParaSwapAdapter
  * @notice Utility functions for adapters using ParaSwap
  * @author Jason Raymond Bell
  */
-abstract contract BaseParaSwapAdapter is ReducedFlashLoanReceiverBase, Ownable {
+abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
   using SafeMath for uint256;
   using GPv2SafeERC20 for IERC20;
   using GPv2SafeERC20 for IERC20Detailed;
@@ -35,6 +36,8 @@ abstract contract BaseParaSwapAdapter is ReducedFlashLoanReceiverBase, Ownable {
   uint256 public constant MAX_SLIPPAGE_PERCENT = 3000; // 30%
 
   IPriceOracleGetter public immutable ORACLE;
+  IPoolAddressesProvider public immutable ADDRESSES_PROVIDER;
+  IPool public immutable POOL;
 
   event Swapped(
     address indexed fromAsset,
@@ -49,10 +52,10 @@ abstract contract BaseParaSwapAdapter is ReducedFlashLoanReceiverBase, Ownable {
     uint256 receivedAmount
   );
 
-  constructor(
-    IPoolAddressesProvider addressesProvider
-  ) ReducedFlashLoanReceiverBase(addressesProvider) {
+  constructor(IPoolAddressesProvider addressesProvider) {
     ORACLE = IPriceOracleGetter(addressesProvider.getPriceOracle());
+    ADDRESSES_PROVIDER = addressesProvider;
+    POOL = IPool(addressesProvider.getPool());
   }
 
   /**

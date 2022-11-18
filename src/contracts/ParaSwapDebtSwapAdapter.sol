@@ -12,6 +12,7 @@ import {ReentrancyGuard} from 'aave-v3-periphery/contracts/dependencies/openzepp
 import {BaseParaSwapBuyAdapter} from './BaseParaSwapBuyAdapter.sol';
 import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry.sol';
 import {IParaSwapAugustus} from '../interfaces/IParaSwapAugustus.sol';
+import {IFlashLoanReceiver} from '../interfaces/IFlashLoanReceiver.sol';
 
 /**
  * @title ParaSwapDebtSwapAdapter
@@ -21,6 +22,7 @@ import {IParaSwapAugustus} from '../interfaces/IParaSwapAugustus.sol';
 contract ParaSwapDebtSwapAdapter is
   BaseParaSwapBuyAdapter,
   ReentrancyGuard,
+  IFlashLoanReceiver,
   Test
 {
   using SafeMath for uint256;
