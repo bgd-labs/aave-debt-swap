@@ -15,7 +15,7 @@ import {IFlashLoanReceiver} from '../interfaces/IFlashLoanReceiver.sol';
 
 /**
  * @title ParaSwapDebtSwapAdapter
- * @notice ParaSwap Adapter to perform a swap of debt for anotehr debt.
+ * @notice ParaSwap Adapter to perform a swap of debt to another debt.
  * @author BGD
  **/
 contract ParaSwapDebtSwapAdapter is
@@ -70,13 +70,12 @@ contract ParaSwapDebtSwapAdapter is
   }
 
   /**
-   * @dev Perform the repay of the debt, pulls the initiator collateral and swaps to repay the flash loan
+   * @dev Swaps the flashed token to the debt token & repays the debt.
    * @param premium Fee of the flash loan
    * @param initiator Address of the user
    * @param newDebtAsset Address of token to be swapped
    * @param newDebtAmount Amount of the reserve to be swapped(flash loan amount)
    */
-
   function _swapAndRepay(
     bytes calldata params,
     uint256 premium,
@@ -114,7 +113,7 @@ contract ParaSwapDebtSwapAdapter is
     IERC20(debtAsset).approve(address(POOL), debtRepayAmount);
     POOL.repay(address(debtAsset), debtRepayAmount, rateMode, initiator);
 
-    // Repay flashloan with dust. Approves for 0 first to comply with tokens that implement the anti frontrunning approval fix.
+    // Repay flashloan with excess. Approves for 0 first to comply with tokens that implement the anti frontrunning approval fix.
     IERC20(newDebtAsset).approve(address(POOL), 0);
     IERC20(newDebtAsset).approve(address(POOL), newDebtAmount.add(premium));
   }
