@@ -256,6 +256,7 @@ contract PspTest is Test {
       vm,
       user,
       userPrivateKey,
+      address(lqSwapAdapter),
       SRC_TOKEN,
       amountWithMargin
     );

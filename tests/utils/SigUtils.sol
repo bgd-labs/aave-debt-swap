@@ -50,12 +50,13 @@ library SigUtils {
     Vm vm,
     address user,
     uint256 userPrivateKey,
+    address spender,
     address token,
     uint256 value
   ) public returns (BaseParaSwapAdapter.PermitSignature memory) {
     Permit memory permit = Permit({
       owner: user,
-      spender: token,
+      spender: spender,
       value: value,
       nonce: IAToken(token).nonces(user),
       deadline: block.timestamp + 1 days
