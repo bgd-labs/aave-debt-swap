@@ -257,7 +257,7 @@ contract PspTest is Test {
       user,
       userPrivateKey,
       address(lqSwapAdapter),
-      SRC_TOKEN,
+      srcReserveData.aTokenAddress,
       amountWithMargin
     );
 
