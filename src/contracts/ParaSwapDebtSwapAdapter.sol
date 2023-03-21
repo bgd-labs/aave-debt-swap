@@ -94,6 +94,7 @@ contract ParaSwapDebtSwapAdapter is
     SwapParams memory swapParams,
     CreditDelegationInput memory creditDelegationPermit
   ) public {
+    // delegate credit
     ICreditDelegationToken(flashloanParams.asset).delegationWithSig(
       msg.sender,
       address(this),
@@ -103,13 +104,13 @@ contract ParaSwapDebtSwapAdapter is
       creditDelegationPermit.r,
       creditDelegationPermit.s
     );
+    // flash & repay
     if (swapParams.debtRepayAmount == type(uint256).max) {
       swapParams.debtRepayAmount = swapParams.rateMode == 2
         ? vTokens[address(swapParams.debtAsset)].balanceOf(msg.sender)
         : sTokens[address(swapParams.debtAsset)].balanceOf(msg.sender);
     }
     bytes memory params = abi.encode(swapParams);
-
     address[] memory assets = new address[](1);
     assets[0] = flashloanParams.asset;
     uint256[] memory amounts = new uint256[](1);
@@ -125,6 +126,8 @@ contract ParaSwapDebtSwapAdapter is
       params,
       REFERRER
     );
+
+    // use excess to repay parts of flash debt
     uint256 excess = IERC20Detailed(flashloanParams.asset).balanceOf(
       address(this)
     );
