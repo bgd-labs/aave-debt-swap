@@ -269,20 +269,14 @@ contract PspTest is Test {
 
     skip(100);
     uint256 amountWithMargin = (amount * 101) / 100;
-    (
-      address augustus,
-      bytes memory swapCalldata,
-      uint256 srcAmount,
-      uint256 destAmount,
-      uint256 offset
-    ) = _fetchPSPRoute(
-        SRC_TOKEN,
-        DEST_TOKEN,
-        amountWithMargin,
-        user,
-        true,
-        true
-      );
+    PsPResponse memory psp = _fetchPSPRoute(
+      SRC_TOKEN,
+      DEST_TOKEN,
+      amountWithMargin,
+      user,
+      true,
+      true
+    );
     BaseParaSwapAdapter.PermitSignature memory signature;
 
     IERC20Detailed(srcReserveData.aTokenAddress).approve(
@@ -291,10 +285,10 @@ contract PspTest is Test {
     );
     bytes memory calldatas = abi.encode(
       IERC20Detailed(DEST_TOKEN),
-      destAmount,
-      offset,
-      swapCalldata,
-      IParaSwapAugustus(augustus),
+      psp.destAmount,
+      psp.offset,
+      psp.swapCalldata,
+      IParaSwapAugustus(psp.augustus),
       (signature)
     );
     _flashSimple(
@@ -311,7 +305,7 @@ contract PspTest is Test {
       destReserveData.aTokenAddress
     ).balanceOf(user);
     assertEq(aSRC_TOKENBalanceAfter, 0);
-    assertGt(aDEST_TOKENBalanceAfter, destAmount);
+    assertGt(aDEST_TOKENBalanceAfter, psp.destAmount);
   }
 
   function test_repayCollateral_leaveDust_noPermit() public {
@@ -322,13 +316,14 @@ contract PspTest is Test {
     _borrow(borrowAmount, SRC_TOKEN);
 
     skip(100);
-    (
-      address augustus,
-      bytes memory swapCalldata,
-      uint256 srcAmount,
-      uint256 destAmount,
-
-    ) = _fetchPSPRoute(DEST_TOKEN, SRC_TOKEN, borrowAmount, user, false, false);
+    PsPResponse memory psp = _fetchPSPRoute(
+      DEST_TOKEN,
+      SRC_TOKEN,
+      borrowAmount,
+      user,
+      false,
+      false
+    );
     BaseParaSwapAdapter.PermitSignature memory signature;
     IERC20Detailed(destReserveData.aTokenAddress).approve(
       address(repayAdapter),
@@ -337,11 +332,11 @@ contract PspTest is Test {
     repayAdapter.swapAndRepay(
       IERC20Detailed(DEST_TOKEN),
       IERC20Detailed(SRC_TOKEN),
-      srcAmount,
+      psp.srcAmount,
       borrowAmount,
       2,
       0,
-      abi.encode(swapCalldata, augustus),
+      abi.encode(psp.swapCalldata, psp.augustus),
       signature
     );
   }
@@ -363,30 +358,24 @@ contract PspTest is Test {
 
     // add some margin to account for accumulated debt
     uint256 amountWithMargin = (borrowAmount * 101) / 100;
-    (
-      address augustus,
-      bytes memory swapCalldata,
-      uint256 srcAmount,
-      uint256 destAmount,
-      uint256 offset
-    ) = _fetchPSPRoute(
-        DEST_TOKEN,
-        SRC_TOKEN,
-        amountWithMargin,
-        user,
-        false,
-        true
-      );
+    PsPResponse memory psp = _fetchPSPRoute(
+      DEST_TOKEN,
+      SRC_TOKEN,
+      amountWithMargin,
+      user,
+      false,
+      true
+    );
 
     // execute flashloan
     bytes memory calldatas = abi.encode(
       IERC20Detailed(SRC_TOKEN),
-      srcAmount,
-      offset,
+      psp.srcAmount,
+      psp.offset,
       2,
-      abi.encode(swapCalldata, augustus)
+      abi.encode(psp.swapCalldata, psp.augustus)
     );
-    _flash(address(debtSwapAdapter), srcAmount, DEST_TOKEN, 2, calldatas);
+    _flash(address(debtSwapAdapter), psp.srcAmount, DEST_TOKEN, 2, calldatas);
 
     uint256 vSRC_TOKENBalanceAfter = IERC20Detailed(
       srcReserveData.variableDebtTokenAddress
@@ -395,6 +384,6 @@ contract PspTest is Test {
       destReserveData.variableDebtTokenAddress
     ).balanceOf(user);
     assertEq(vSRC_TOKENBalanceAfter, 0);
-    assertEq(vDEST_TOKENBalanceAfter, srcAmount);
+    assertEq(vDEST_TOKENBalanceAfter, psp.srcAmount);
   }
 }

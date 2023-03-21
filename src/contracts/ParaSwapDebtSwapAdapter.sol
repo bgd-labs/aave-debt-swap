@@ -25,12 +25,73 @@ contract ParaSwapDebtSwapAdapter is
 {
   using SafeMath for uint256;
 
+  uint16 constant REFERRER = 100;
+
+  mapping(address => IERC20WithPermit) public aTokens;
+  mapping(address => IERC20WithPermit) public vTokens;
+  mapping(address => IERC20WithPermit) public sTokens;
+
   constructor(
     IPoolAddressesProvider addressesProvider,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
   ) BaseParaSwapBuyAdapter(addressesProvider, augustusRegistry) {
     transferOwnership(owner);
+  }
+
+  /**
+   * @dev caches all reserves
+   */
+  function cacheReserves() public {
+    address[] memory reserves = POOL.getReservesList();
+    for (uint256 i = 0; i < reserves.length; i++) {
+      if (address(aTokens[reserves[i]]) == address(0)) {
+        cacheReserve(reserves[i]);
+      }
+    }
+  }
+
+  /**
+   * @dev Adds a reserve to the cache & renewes the approval
+   */
+  function cacheReserve(address reserve) public {
+    DataTypes.ReserveData memory reserveData = _getReserveData(reserve);
+    aTokens[reserve] = IERC20WithPermit(reserveData.aTokenAddress);
+    vTokens[reserve] = IERC20WithPermit(reserveData.variableDebtTokenAddress);
+    sTokens[reserve] = IERC20WithPermit(reserveData.stableDebtTokenAddress);
+
+    IERC20WithPermit(reserve).approve(address(POOL), 0);
+    IERC20WithPermit(reserve).approve(address(POOL), type(uint256).max);
+  }
+
+  struct FlashloanParams {
+    address[] assets;
+    uint256[] amounts;
+    uint256[] interestRateModes;
+  }
+
+  struct SwapParams {
+    IERC20Detailed debtAsset;
+    uint256 debtRepayAmount;
+    uint256 buyAllBalanceOffset;
+    uint256 rateMode;
+    bytes paraswapData;
+  }
+
+  function swapDebt(
+    FlashloanParams memory flashloanParams,
+    SwapParams memory swapParams
+  ) public {
+    bytes memory params = abi.encode(swapParams);
+    POOL.flashLoan(
+      address(this),
+      flashloanParams.assets,
+      flashloanParams.amounts,
+      flashloanParams.interestRateModes,
+      msg.sender,
+      params,
+      REFERRER
+    );
   }
 
   /**
@@ -52,6 +113,7 @@ contract ParaSwapDebtSwapAdapter is
     bytes calldata params
   ) external returns (bool) {
     require(msg.sender == address(POOL), 'CALLER_MUST_BE_POOL');
+    require(initiator == address(this), 'INITIATOR_MUST_BE_THIS');
 
     uint256 newDebtAmount = amounts[0];
     address initiatorLocal = initiator;
