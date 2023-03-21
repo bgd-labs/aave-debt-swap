@@ -12,6 +12,7 @@ import {BaseParaSwapBuyAdapter} from './BaseParaSwapBuyAdapter.sol';
 import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry.sol';
 import {IParaSwapAugustus} from '../interfaces/IParaSwapAugustus.sol';
 import {IFlashLoanReceiver} from '../interfaces/IFlashLoanReceiver.sol';
+import {ICreditDelegationToken} from '../interfaces/ICreditDelegationToken.sol';
 
 /**
  * @title ParaSwapDebtSwapAdapter
@@ -37,6 +38,7 @@ contract ParaSwapDebtSwapAdapter is
     address owner
   ) BaseParaSwapBuyAdapter(addressesProvider, augustusRegistry) {
     transferOwnership(owner);
+    cacheReserves();
   }
 
   /**
@@ -46,52 +48,83 @@ contract ParaSwapDebtSwapAdapter is
     address[] memory reserves = POOL.getReservesList();
     for (uint256 i = 0; i < reserves.length; i++) {
       if (address(aTokens[reserves[i]]) == address(0)) {
-        cacheReserve(reserves[i]);
+        IERC20WithPermit(reserves[i]).approve(address(POOL), type(uint256).max);
       }
     }
   }
 
-  /**
-   * @dev Adds a reserve to the cache & renewes the approval
-   */
-  function cacheReserve(address reserve) public {
-    DataTypes.ReserveData memory reserveData = _getReserveData(reserve);
-    aTokens[reserve] = IERC20WithPermit(reserveData.aTokenAddress);
-    vTokens[reserve] = IERC20WithPermit(reserveData.variableDebtTokenAddress);
-    sTokens[reserve] = IERC20WithPermit(reserveData.stableDebtTokenAddress);
-
+  function renewAllowance(address reserve) public {
     IERC20WithPermit(reserve).approve(address(POOL), 0);
     IERC20WithPermit(reserve).approve(address(POOL), type(uint256).max);
   }
 
   struct FlashloanParams {
-    address[] assets;
-    uint256[] amounts;
-    uint256[] interestRateModes;
+    address asset;
+    uint256 amount;
+    uint256 interestRateMode;
   }
 
   struct SwapParams {
     IERC20Detailed debtAsset;
     uint256 debtRepayAmount;
-    uint256 buyAllBalanceOffset;
     uint256 rateMode;
     bytes paraswapData;
   }
 
+  struct CreditDelegationInput {
+    ICreditDelegationToken debtToken;
+    uint256 value;
+    uint256 deadline;
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+  }
+
   function swapDebt(
     FlashloanParams memory flashloanParams,
-    SwapParams memory swapParams
+    SwapParams memory swapParams,
+    CreditDelegationInput memory creditDelegationPermit
   ) public {
+    ICreditDelegationToken(flashloanParams.asset).delegationWithSig(
+      msg.sender,
+      address(this),
+      creditDelegationPermit.value,
+      creditDelegationPermit.deadline,
+      creditDelegationPermit.v,
+      creditDelegationPermit.r,
+      creditDelegationPermit.s
+    );
+    if (swapParams.debtRepayAmount == type(uint256).max) {
+      swapParams.debtRepayAmount = swapParams.debtAsset.balanceOf(msg.sender);
+    }
     bytes memory params = abi.encode(swapParams);
+
+    address[] memory assets = new address[](1);
+    assets[0] = flashloanParams.asset;
+    uint256[] memory amounts = new uint256[](1);
+    amounts[0] = flashloanParams.amount;
+    uint256[] memory interestRateModes = new uint256[](1);
+    interestRateModes[0] = flashloanParams.interestRateMode;
     POOL.flashLoan(
       address(this),
-      flashloanParams.assets,
-      flashloanParams.amounts,
-      flashloanParams.interestRateModes,
+      assets,
+      amounts,
+      interestRateModes,
       msg.sender,
       params,
       REFERRER
     );
+    uint256 excess = IERC20Detailed(flashloanParams.asset).balanceOf(
+      address(this)
+    );
+    if (excess > 0) {
+      POOL.repay(
+        address(flashloanParams.asset),
+        excess,
+        flashloanParams.interestRateMode,
+        msg.sender
+      );
+    }
   }
 
   /**
@@ -120,27 +153,19 @@ contract ParaSwapDebtSwapAdapter is
 
     IERC20Detailed newDebtAsset = IERC20Detailed(assets[0]);
 
-    _swapAndRepay(
-      params,
-      premiums[0],
-      initiatorLocal,
-      newDebtAsset,
-      newDebtAmount
-    );
+    _swapAndRepay(params, initiatorLocal, newDebtAsset, newDebtAmount);
 
     return true;
   }
 
   /**
    * @dev Swaps the flashed token to the debt token & repays the debt.
-   * @param premium Fee of the flash loan
    * @param initiator Address of the user
    * @param newDebtAsset Address of token to be swapped
    * @param newDebtAmount Amount of the reserve to be swapped(flash loan amount)
    */
   function _swapAndRepay(
     bytes calldata params,
-    uint256 premium,
     address initiator,
     IERC20Detailed newDebtAsset,
     uint256 newDebtAmount
@@ -153,14 +178,6 @@ contract ParaSwapDebtSwapAdapter is
       bytes memory paraswapData
     ) = abi.decode(params, (IERC20Detailed, uint256, uint256, uint256, bytes));
 
-    debtRepayAmount = getDebtRepayAmount(
-      debtAsset,
-      rateMode,
-      buyAllBalanceOffset,
-      debtRepayAmount,
-      initiator
-    );
-
     uint256 amountSold = _buyOnParaSwap(
       buyAllBalanceOffset,
       paraswapData,
@@ -170,41 +187,13 @@ contract ParaSwapDebtSwapAdapter is
       debtRepayAmount
     );
 
-    // Repay debt. Approves for 0 first to comply with tokens that implement the anti frontrunning approval fix.
-    IERC20(debtAsset).approve(address(POOL), 0);
-    IERC20(debtAsset).approve(address(POOL), debtRepayAmount);
-    POOL.repay(address(debtAsset), debtRepayAmount, rateMode, initiator);
-
-    // Repay flashloan with excess. Approves for 0 first to comply with tokens that implement the anti frontrunning approval fix.
-    IERC20(newDebtAsset).approve(address(POOL), 0);
-    IERC20(newDebtAsset).approve(address(POOL), newDebtAmount.add(premium));
-  }
-
-  function getDebtRepayAmount(
-    IERC20Detailed debtAsset,
-    uint256 rateMode,
-    uint256 buyAllBalanceOffset,
-    uint256 debtRepayAmount,
-    address initiator
-  ) private view returns (uint256) {
-    DataTypes.ReserveData memory debtReserveData = _getReserveData(
-      address(debtAsset)
+    uint256 allowance = IERC20(debtAsset).allowance(
+      address(this),
+      address(POOL)
     );
-
-    address debtToken = DataTypes.InterestRateMode(rateMode) ==
-      DataTypes.InterestRateMode.STABLE
-      ? debtReserveData.stableDebtTokenAddress
-      : debtReserveData.variableDebtTokenAddress;
-
-    uint256 currentDebt = IERC20(debtToken).balanceOf(initiator);
-
-    if (buyAllBalanceOffset != 0) {
-      require(currentDebt <= debtRepayAmount, 'INSUFFICIENT_AMOUNT_TO_REPAY');
-      debtRepayAmount = currentDebt;
-    } else {
-      require(debtRepayAmount <= currentDebt, 'INVALID_DEBT_REPAY_AMOUNT');
+    if (allowance < debtRepayAmount) {
+      renewAllowance(address(debtAsset));
     }
-
-    return debtRepayAmount;
+    POOL.repay(address(debtAsset), debtRepayAmount, rateMode, initiator);
   }
 }
