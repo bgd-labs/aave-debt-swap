@@ -45,9 +45,18 @@ contract ParaSwapDebtSwapAdapter is
    * @dev caches all reserves
    */
   function cacheReserves() public {
+    DataTypes.ReserveData memory reserveData;
     address[] memory reserves = POOL.getReservesList();
     for (uint256 i = 0; i < reserves.length; i++) {
       if (address(aTokens[reserves[i]]) == address(0)) {
+        reserveData = POOL.getReserveData(reserves[i]);
+        aTokens[reserves[i]] = IERC20WithPermit(reserveData.aTokenAddress);
+        vTokens[reserves[i]] = IERC20WithPermit(
+          reserveData.variableDebtTokenAddress
+        );
+        sTokens[reserves[i]] = IERC20WithPermit(
+          reserveData.stableDebtTokenAddress
+        );
         IERC20WithPermit(reserves[i]).approve(address(POOL), type(uint256).max);
       }
     }
@@ -95,7 +104,9 @@ contract ParaSwapDebtSwapAdapter is
       creditDelegationPermit.s
     );
     if (swapParams.debtRepayAmount == type(uint256).max) {
-      swapParams.debtRepayAmount = swapParams.debtAsset.balanceOf(msg.sender);
+      swapParams.debtRepayAmount = swapParams.rateMode == 2
+        ? vTokens[address(swapParams.debtAsset)].balanceOf(msg.sender)
+        : sTokens[address(swapParams.debtAsset)].balanceOf(msg.sender);
     }
     bytes memory params = abi.encode(swapParams);
 
@@ -191,6 +202,7 @@ contract ParaSwapDebtSwapAdapter is
       address(this),
       address(POOL)
     );
+
     if (allowance < debtRepayAmount) {
       renewAllowance(address(debtAsset));
     }

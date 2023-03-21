@@ -376,6 +376,7 @@ contract PspTest is Test {
       abi.encode(psp.swapCalldata, psp.augustus)
     );
     _flash(address(debtSwapAdapter), psp.srcAmount, DEST_TOKEN, 2, calldatas);
+    // debtSwapAdapter.swapDebt();
 
     uint256 vSRC_TOKENBalanceAfter = IERC20Detailed(
       srcReserveData.variableDebtTokenAddress
