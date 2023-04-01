@@ -25,7 +25,6 @@ contract BaseTest is Test {
   function setUp() public virtual {
     userPrivateKey = 0xA11CE;
     user = address(vm.addr(userPrivateKey));
-    console.log(user);
   }
 
   function _fetchPSPRoute(

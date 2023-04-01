@@ -14,6 +14,7 @@ import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry
 import {IParaSwapAugustus} from '../interfaces/IParaSwapAugustus.sol';
 import {IFlashLoanReceiver} from '../interfaces/IFlashLoanReceiver.sol';
 import {ICreditDelegationToken} from '../interfaces/ICreditDelegationToken.sol';
+import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
 
 /**
  * @title ParaSwapDebtSwapAdapter
@@ -21,6 +22,7 @@ import {ICreditDelegationToken} from '../interfaces/ICreditDelegationToken.sol';
  * @author BGD
  **/
 contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFlashLoanReceiver {
+  using SafeERC20 for IERC20WithPermit;
   using SafeMath for uint256;
 
   uint16 constant REFERRER = 100;
@@ -60,16 +62,21 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     IERC20WithPermit(reserve).safeApprove(address(POOL), type(uint256).max);
   }
 
-  struct FlashloanParams {
-    address asset;
-    uint256 amount;
-    uint256 interestRateMode;
-  }
-
-  struct SwapParams {
-    IERC20Detailed debtAsset;
+  struct FlashParams {
+    address debtAsset;
     uint256 debtRepayAmount;
     uint256 debtRateMode;
+    bytes paraswapData;
+    address user;
+  }
+
+  struct DebtSwapParams {
+    address debtAsset;
+    uint256 debtRepayAmount;
+    uint256 debtRateMode;
+    address newDebtAsset;
+    uint256 maxNewDebtAmount;
+    uint256 newDebtRateMode;
     bytes paraswapData;
   }
 
@@ -87,53 +94,59 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
    * 2. Flashloan in new debt
    * 3. swap new debt to old debt
    * 4. repay old debt
-   * @param flashloanParams y
-   * @param swapParams y
+   * @param debtSwapParams y
    */
   function swapDebt(
-    FlashloanParams memory flashloanParams,
-    SwapParams memory swapParams // CreditDelegationInput memory creditDelegationPermit
+    DebtSwapParams memory debtSwapParams,
+    CreditDelegationInput memory creditDelegationPermit
   ) public {
-    uint256 excessBefore = IERC20Detailed(flashloanParams.asset).balanceOf(address(this));
+    uint256 excessBefore = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     // delegate credit
-    // ICreditDelegationToken(flashloanParams.asset).delegationWithSig(
-    //   msg.sender,
-    //   address(this),
-    //   creditDelegationPermit.value,
-    //   creditDelegationPermit.deadline,
-    //   creditDelegationPermit.v,
-    //   creditDelegationPermit.r,
-    //   creditDelegationPermit.s
-    // );
-    // flash & repay
-    if (swapParams.debtRepayAmount == type(uint256).max) {
-      swapParams.debtRepayAmount = swapParams.debtRateMode == 2
-        ? vTokens[address(swapParams.debtAsset)].balanceOf(msg.sender)
-        : sTokens[address(swapParams.debtAsset)].balanceOf(msg.sender);
+    if (creditDelegationPermit.deadline != 0) {
+      ICreditDelegationToken(debtSwapParams.newDebtAsset).delegationWithSig(
+        msg.sender,
+        address(this),
+        creditDelegationPermit.value,
+        creditDelegationPermit.deadline,
+        creditDelegationPermit.v,
+        creditDelegationPermit.r,
+        creditDelegationPermit.s
+      );
     }
-    bytes memory params = abi.encode(msg.sender, swapParams);
+    // flash & repay
+    if (debtSwapParams.debtRepayAmount == type(uint256).max) {
+      debtSwapParams.debtRepayAmount = debtSwapParams.debtRateMode == 2
+        ? vTokens[address(debtSwapParams.debtAsset)].balanceOf(msg.sender)
+        : sTokens[address(debtSwapParams.debtAsset)].balanceOf(msg.sender);
+    }
+    FlashParams memory flashParams = FlashParams(
+      debtSwapParams.debtAsset,
+      debtSwapParams.debtRepayAmount,
+      debtSwapParams.debtRateMode,
+      debtSwapParams.paraswapData,
+      msg.sender
+    );
+    bytes memory params = abi.encode(flashParams);
     address[] memory assets = new address[](1);
-    assets[0] = flashloanParams.asset;
+    assets[0] = debtSwapParams.newDebtAsset;
     uint256[] memory amounts = new uint256[](1);
-    amounts[0] = flashloanParams.amount;
+    amounts[0] = debtSwapParams.maxNewDebtAmount;
     uint256[] memory interestRateModes = new uint256[](1);
-    interestRateModes[0] = flashloanParams.interestRateMode;
+    interestRateModes[0] = debtSwapParams.newDebtRateMode;
     POOL.flashLoan(address(this), assets, amounts, interestRateModes, msg.sender, params, REFERRER);
 
     // use excess to repay parts of flash debt
-    uint256 excessAfter = IERC20Detailed(flashloanParams.asset).balanceOf(address(this));
+    uint256 excessAfter = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     uint256 excess = excessAfter - excessBefore;
     if (excess > 0) {
-      uint256 allowance = IERC20(flashloanParams.asset).allowance(address(this), address(POOL));
-      if (allowance < excess) {
-        renewAllowance(address(flashloanParams.asset));
-      }
-      POOL.repay(
-        address(flashloanParams.asset),
-        excess,
-        flashloanParams.interestRateMode,
-        msg.sender
+      uint256 allowance = IERC20(debtSwapParams.newDebtAsset).allowance(
+        address(this),
+        address(POOL)
       );
+      if (allowance < excess) {
+        renewAllowance(debtSwapParams.newDebtAsset);
+      }
+      POOL.repay(debtSwapParams.newDebtAsset, excess, debtSwapParams.newDebtRateMode, msg.sender);
     }
   }
 
@@ -174,13 +187,13 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     IERC20Detailed newDebtAsset,
     uint256 newDebtAmount
   ) private {
-    (address user, SwapParams memory swapParams) = abi.decode(params, (address, SwapParams));
+    FlashParams memory swapParams = abi.decode(params, (FlashParams));
 
     uint256 amountSold = _buyOnParaSwap(
       0,
       swapParams.paraswapData,
       newDebtAsset,
-      swapParams.debtAsset,
+      IERC20Detailed(swapParams.debtAsset),
       newDebtAmount,
       swapParams.debtRepayAmount
     );
@@ -194,7 +207,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
       address(swapParams.debtAsset),
       swapParams.debtRepayAmount,
       swapParams.debtRateMode,
-      user
+      swapParams.user
     );
   }
 }
