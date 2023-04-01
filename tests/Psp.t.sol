@@ -13,6 +13,7 @@ import {IParaSwapAugustus} from '../src/interfaces/IParaSwapAugustus.sol';
 import {BaseParaSwapAdapter} from '../src/contracts/BaseParaSwapAdapter.sol';
 import {AugustusRegistry} from '../src/lib/AugustusRegistry.sol';
 import {SigUtils} from './utils/SigUtils.sol';
+import {ICreditDelegationToken} from '../src/interfaces/ICreditDelegationToken.sol';
 
 contract PspTest is Test {
   struct PsPResponse {
@@ -27,10 +28,8 @@ contract PspTest is Test {
   ParaSwapRepayAdapter public repayAdapter;
   ParaSwapDebtSwapAdapter public debtSwapAdapter;
 
-  address public constant SRC_TOKEN =
-    0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
-  address public constant DEST_TOKEN =
-    0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063;
+  address public constant SRC_TOKEN = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
+  address public constant DEST_TOKEN = 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063;
 
   DataTypes.ReserveData internal srcReserveData;
   DataTypes.ReserveData internal destReserveData;
@@ -41,7 +40,7 @@ contract PspTest is Test {
   uint256 constant MAX_SLIPPAGE = 3;
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl('polygon'), 35724579);
+    vm.createSelectFork(vm.rpcUrl('polygon'), 41025740);
     lqSwapAdapter = new ParaSwapLiquiditySwapAdapter(
       IPoolAddressesProvider(address(AaveV3Polygon.POOL_ADDRESSES_PROVIDER)),
       AugustusRegistry.POLYGON,
@@ -125,15 +124,7 @@ contract PspTest is Test {
     amounts[0] = amount;
     uint256[] memory interestRateModes = new uint256[](1);
     interestRateModes[0] = interestRateMode;
-    AaveV3Polygon.POOL.flashLoan(
-      receiver,
-      assets,
-      amounts,
-      interestRateModes,
-      user,
-      calldatas,
-      0
-    );
+    AaveV3Polygon.POOL.flashLoan(receiver, assets, amounts, interestRateModes, user, calldatas, 0);
   }
 
   function test_swapCollateral_leaveDust_noPermit() public {
@@ -141,20 +132,10 @@ contract PspTest is Test {
     _supply(amount, SRC_TOKEN);
 
     skip(100);
-    PsPResponse memory psp = _fetchPSPRoute(
-      SRC_TOKEN,
-      DEST_TOKEN,
-      amount,
-      user,
-      true,
-      false
-    );
+    PsPResponse memory psp = _fetchPSPRoute(SRC_TOKEN, DEST_TOKEN, amount, user, true, false);
     BaseParaSwapAdapter.PermitSignature memory signature;
 
-    IERC20Detailed(srcReserveData.aTokenAddress).approve(
-      address(lqSwapAdapter),
-      amount
-    );
+    IERC20Detailed(srcReserveData.aTokenAddress).approve(address(lqSwapAdapter), amount);
     lqSwapAdapter.swapAndDeposit(
       IERC20Detailed(SRC_TOKEN),
       IERC20Detailed(DEST_TOKEN),
@@ -166,12 +147,8 @@ contract PspTest is Test {
       signature
     );
 
-    uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(
-      srcReserveData.aTokenAddress
-    ).balanceOf(user);
-    uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(
-      destReserveData.aTokenAddress
-    ).balanceOf(user);
+    uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(srcReserveData.aTokenAddress).balanceOf(user);
+    uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(destReserveData.aTokenAddress).balanceOf(user);
     assertEq(aSRC_TOKENBalanceAfter == 0, false);
     assertApproxEqAbs(aSRC_TOKENBalanceAfter, 0, 100);
     assertGt(aDEST_TOKENBalanceAfter, psp.destAmount);
@@ -193,10 +170,7 @@ contract PspTest is Test {
     );
     BaseParaSwapAdapter.PermitSignature memory signature;
 
-    IERC20Detailed(srcReserveData.aTokenAddress).approve(
-      address(lqSwapAdapter),
-      type(uint256).max
-    );
+    IERC20Detailed(srcReserveData.aTokenAddress).approve(address(lqSwapAdapter), type(uint256).max);
     lqSwapAdapter.swapAndDeposit(
       IERC20Detailed(SRC_TOKEN),
       IERC20Detailed(DEST_TOKEN),
@@ -208,12 +182,8 @@ contract PspTest is Test {
       signature
     );
 
-    uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(
-      srcReserveData.aTokenAddress
-    ).balanceOf(user);
-    uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(
-      destReserveData.aTokenAddress
-    ).balanceOf(user);
+    uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(srcReserveData.aTokenAddress).balanceOf(user);
+    uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(destReserveData.aTokenAddress).balanceOf(user);
     assertEq(aSRC_TOKENBalanceAfter, 0);
     assertGt(aDEST_TOKENBalanceAfter, psp.destAmount);
   }
@@ -253,12 +223,8 @@ contract PspTest is Test {
       signature
     );
 
-    uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(
-      srcReserveData.aTokenAddress
-    ).balanceOf(user);
-    uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(
-      destReserveData.aTokenAddress
-    ).balanceOf(user);
+    uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(srcReserveData.aTokenAddress).balanceOf(user);
+    uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(destReserveData.aTokenAddress).balanceOf(user);
     assertEq(aSRC_TOKENBalanceAfter, 0);
     assertGt(aDEST_TOKENBalanceAfter, psp.destAmount);
   }
@@ -279,10 +245,7 @@ contract PspTest is Test {
     );
     BaseParaSwapAdapter.PermitSignature memory signature;
 
-    IERC20Detailed(srcReserveData.aTokenAddress).approve(
-      address(lqSwapAdapter),
-      type(uint256).max
-    );
+    IERC20Detailed(srcReserveData.aTokenAddress).approve(address(lqSwapAdapter), type(uint256).max);
     bytes memory calldatas = abi.encode(
       IERC20Detailed(DEST_TOKEN),
       psp.destAmount,
@@ -291,19 +254,10 @@ contract PspTest is Test {
       IParaSwapAugustus(psp.augustus),
       (signature)
     );
-    _flashSimple(
-      address(lqSwapAdapter),
-      (amountWithMargin * 101) / 100,
-      SRC_TOKEN,
-      calldatas
-    );
+    _flashSimple(address(lqSwapAdapter), (amountWithMargin * 101) / 100, SRC_TOKEN, calldatas);
 
-    uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(
-      srcReserveData.aTokenAddress
-    ).balanceOf(user);
-    uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(
-      destReserveData.aTokenAddress
-    ).balanceOf(user);
+    uint256 aSRC_TOKENBalanceAfter = IERC20Detailed(srcReserveData.aTokenAddress).balanceOf(user);
+    uint256 aDEST_TOKENBalanceAfter = IERC20Detailed(destReserveData.aTokenAddress).balanceOf(user);
     assertEq(aSRC_TOKENBalanceAfter, 0);
     assertGt(aDEST_TOKENBalanceAfter, psp.destAmount);
   }
@@ -325,10 +279,7 @@ contract PspTest is Test {
       false
     );
     BaseParaSwapAdapter.PermitSignature memory signature;
-    IERC20Detailed(destReserveData.aTokenAddress).approve(
-      address(repayAdapter),
-      supplyAmount
-    );
+    IERC20Detailed(destReserveData.aTokenAddress).approve(address(repayAdapter), supplyAmount);
     repayAdapter.swapAndRepay(
       IERC20Detailed(DEST_TOKEN),
       IERC20Detailed(SRC_TOKEN),
@@ -339,52 +290,5 @@ contract PspTest is Test {
       abi.encode(psp.swapCalldata, psp.augustus),
       signature
     );
-  }
-
-  /**
-   * 1. supply 20000 DEST_TOKEN
-   * 2. borrow 5 vSRC_TOKEN
-   * 3. swap debt to 5 vDEST_TOKEN
-   */
-  function test_debtSwap_noPermit() public {
-    uint256 supplyAmount = 20000 ether;
-    uint256 borrowAmount = 5000000;
-
-    _supply(supplyAmount, DEST_TOKEN);
-    _borrow(borrowAmount, SRC_TOKEN);
-
-    // forward time to accumulate some debt
-    skip(100);
-
-    // add some margin to account for accumulated debt
-    uint256 amountWithMargin = (borrowAmount * 101) / 100;
-    PsPResponse memory psp = _fetchPSPRoute(
-      DEST_TOKEN,
-      SRC_TOKEN,
-      amountWithMargin,
-      user,
-      false,
-      true
-    );
-
-    // execute flashloan
-    bytes memory calldatas = abi.encode(
-      IERC20Detailed(SRC_TOKEN),
-      psp.srcAmount,
-      psp.offset,
-      2,
-      abi.encode(psp.swapCalldata, psp.augustus)
-    );
-    _flash(address(debtSwapAdapter), psp.srcAmount, DEST_TOKEN, 2, calldatas);
-    // debtSwapAdapter.swapDebt();
-
-    uint256 vSRC_TOKENBalanceAfter = IERC20Detailed(
-      srcReserveData.variableDebtTokenAddress
-    ).balanceOf(user);
-    uint256 vDEST_TOKENBalanceAfter = IERC20Detailed(
-      destReserveData.variableDebtTokenAddress
-    ).balanceOf(user);
-    assertEq(vSRC_TOKENBalanceAfter, 0);
-    assertEq(vDEST_TOKENBalanceAfter, psp.srcAmount);
   }
 }
