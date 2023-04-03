@@ -90,11 +90,13 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
   }
 
   /**
+   * @dev Swaps one type of debt to another. Therfore this methods performs the following actions in order:
    * 1. Delegate credit in new debt
    * 2. Flashloan in new debt
    * 3. swap new debt to old debt
    * 4. repay old debt
-   * @param debtSwapParams y
+   * @param debtSwapParams the parameters describing the swap
+   * @param creditDelegationPermit optional permit for credit delegation
    */
   function swapDebt(
     DebtSwapParams memory debtSwapParams,
