@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: agpl-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
 import 'forge-std/Test.sol';
@@ -19,7 +19,7 @@ import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
 /**
  * @title ParaSwapDebtSwapAdapter
  * @notice ParaSwap Adapter to perform a swap of debt to another debt.
- * @author BGD
+ * @author BGD labs
  **/
 contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFlashLoanReceiver {
   using SafeERC20 for IERC20WithPermit;
@@ -27,15 +27,12 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
 
   uint16 constant REFERRER = 100;
 
-  mapping(address => IERC20WithPermit) public aTokens;
-  mapping(address => IERC20WithPermit) public vTokens;
-  mapping(address => IERC20WithPermit) public sTokens;
-
   constructor(
     IPoolAddressesProvider addressesProvider,
+    address pool,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
-  ) BaseParaSwapBuyAdapter(addressesProvider, augustusRegistry) {
+  ) BaseParaSwapBuyAdapter(addressesProvider, pool, augustusRegistry) {
     transferOwnership(owner);
     cacheReserves();
   }
@@ -44,16 +41,9 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
    * @dev caches all reserves
    */
   function cacheReserves() public {
-    DataTypes.ReserveData memory reserveData;
     address[] memory reserves = POOL.getReservesList();
     for (uint256 i = 0; i < reserves.length; i++) {
-      if (address(aTokens[reserves[i]]) == address(0)) {
-        reserveData = POOL.getReserveData(reserves[i]);
-        aTokens[reserves[i]] = IERC20WithPermit(reserveData.aTokenAddress);
-        vTokens[reserves[i]] = IERC20WithPermit(reserveData.variableDebtTokenAddress);
-        sTokens[reserves[i]] = IERC20WithPermit(reserveData.stableDebtTokenAddress);
-        IERC20WithPermit(reserves[i]).safeApprove(address(POOL), type(uint256).max);
-      }
+      IERC20WithPermit(reserves[i]).safeApprove(address(POOL), type(uint256).max);
     }
   }
 
@@ -76,7 +66,6 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     uint256 debtRateMode;
     address newDebtAsset;
     uint256 maxNewDebtAmount;
-    uint256 newDebtRateMode;
     bytes paraswapData;
   }
 
@@ -105,7 +94,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     uint256 excessBefore = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     // delegate credit
     if (creditDelegationPermit.deadline != 0) {
-      ICreditDelegationToken(debtSwapParams.newDebtAsset).delegationWithSig(
+      ICreditDelegationToken(creditDelegationPermit.debtToken).delegationWithSig(
         msg.sender,
         address(this),
         creditDelegationPermit.value,
@@ -117,9 +106,10 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     }
     // flash & repay
     if (debtSwapParams.debtRepayAmount == type(uint256).max) {
+      DataTypes.ReserveData memory reserveData = POOL.getReserveData(debtSwapParams.debtAsset);
       debtSwapParams.debtRepayAmount = debtSwapParams.debtRateMode == 2
-        ? vTokens[address(debtSwapParams.debtAsset)].balanceOf(msg.sender)
-        : sTokens[address(debtSwapParams.debtAsset)].balanceOf(msg.sender);
+        ? IERC20WithPermit(reserveData.variableDebtTokenAddress).balanceOf(msg.sender)
+        : IERC20WithPermit(reserveData.stableDebtTokenAddress).balanceOf(msg.sender);
     }
     FlashParams memory flashParams = FlashParams(
       debtSwapParams.debtAsset,
@@ -134,7 +124,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     uint256[] memory amounts = new uint256[](1);
     amounts[0] = debtSwapParams.maxNewDebtAmount;
     uint256[] memory interestRateModes = new uint256[](1);
-    interestRateModes[0] = debtSwapParams.newDebtRateMode;
+    interestRateModes[0] = 2;
     POOL.flashLoan(address(this), assets, amounts, interestRateModes, msg.sender, params, REFERRER);
 
     // use excess to repay parts of flash debt
@@ -148,7 +138,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
       if (allowance < excess) {
         renewAllowance(debtSwapParams.newDebtAsset);
       }
-      POOL.repay(debtSwapParams.newDebtAsset, excess, debtSwapParams.newDebtRateMode, msg.sender);
+      POOL.repay(debtSwapParams.newDebtAsset, excess, 2, msg.sender);
     }
   }
 
@@ -172,26 +162,25 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     require(msg.sender == address(POOL), 'CALLER_MUST_BE_POOL');
     require(initiator == address(this), 'INITIATOR_MUST_BE_THIS');
 
-    _swapAndRepay(params, initiator, IERC20Detailed(assets[0]), amounts[0]);
+    _swapAndRepay(params, IERC20Detailed(assets[0]), amounts[0]);
 
     return true;
   }
 
   /**
    * @dev Swaps the flashed token to the debt token & repays the debt.
-   * @param initiator Address of the user
+   * @param params Encoded swap parameters
    * @param newDebtAsset Address of token to be swapped
    * @param newDebtAmount Amount of the reserve to be swapped(flash loan amount)
    */
   function _swapAndRepay(
     bytes calldata params,
-    address initiator,
     IERC20Detailed newDebtAsset,
     uint256 newDebtAmount
   ) private {
     FlashParams memory swapParams = abi.decode(params, (FlashParams));
 
-    uint256 amountSold = _buyOnParaSwap(
+    _buyOnParaSwap(
       0,
       swapParams.paraswapData,
       newDebtAsset,
@@ -201,10 +190,10 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     );
 
     uint256 allowance = IERC20(swapParams.debtAsset).allowance(address(this), address(POOL));
-
     if (allowance < swapParams.debtRepayAmount) {
       renewAllowance(address(swapParams.debtAsset));
     }
+
     POOL.repay(
       address(swapParams.debtAsset),
       swapParams.debtRepayAmount,

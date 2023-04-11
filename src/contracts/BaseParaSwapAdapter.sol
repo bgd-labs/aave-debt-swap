@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: agpl-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
@@ -52,10 +52,10 @@ abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
     uint256 receivedAmount
   );
 
-  constructor(IPoolAddressesProvider addressesProvider) {
+  constructor(IPoolAddressesProvider addressesProvider, address pool) {
     ORACLE = IPriceOracleGetter(addressesProvider.getPriceOracle());
     ADDRESSES_PROVIDER = addressesProvider;
-    POOL = IPool(addressesProvider.getPool());
+    POOL = IPool(pool);
   }
 
   /**
@@ -82,9 +82,7 @@ abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
    * @dev Get the aToken associated to the asset
    * @return address of the aToken
    */
-  function _getReserveData(
-    address asset
-  ) internal view returns (DataTypes.ReserveData memory) {
+  function _getReserveData(address asset) internal view returns (DataTypes.ReserveData memory) {
     return POOL.getReserveData(asset);
   }
 
@@ -97,13 +95,7 @@ abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
     IERC20WithPermit reserveAToken = IERC20WithPermit(
       _getReserveData(address(reserve)).aTokenAddress
     );
-    _pullATokenAndWithdraw(
-      reserve,
-      reserveAToken,
-      user,
-      amount,
-      permitSignature
-    );
+    _pullATokenAndWithdraw(reserve, reserveAToken, user, amount, permitSignature);
   }
 
   /**
@@ -138,10 +130,7 @@ abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
     reserveAToken.safeTransferFrom(user, address(this), amount);
 
     // withdraw reserve
-    require(
-      POOL.withdraw(reserve, amount, address(this)) == amount,
-      'UNEXPECTED_AMOUNT_WITHDRAWN'
-    );
+    require(POOL.withdraw(reserve, amount, address(this)) == amount, 'UNEXPECTED_AMOUNT_WITHDRAWN');
   }
 
   /**

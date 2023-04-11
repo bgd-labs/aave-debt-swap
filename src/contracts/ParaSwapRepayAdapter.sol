@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: agpl-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
@@ -18,18 +18,15 @@ import {IFlashLoanSimpleReceiver} from '../interfaces/IFlashLoanSimpleReceiver.s
  * @notice ParaSwap Adapter to perform a repay of a debt with collateral.
  * @author Aave
  **/
-contract ParaSwapRepayAdapter is
-  BaseParaSwapBuyAdapter,
-  ReentrancyGuard,
-  IFlashLoanSimpleReceiver
-{
+contract ParaSwapRepayAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFlashLoanSimpleReceiver {
   using SafeMath for uint256;
 
   constructor(
     IPoolAddressesProvider addressesProvider,
+    address pool,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
-  ) BaseParaSwapBuyAdapter(addressesProvider, augustusRegistry) {
+  ) BaseParaSwapBuyAdapter(addressesProvider, pool, augustusRegistry) {
     transferOwnership(owner);
   }
 
@@ -69,13 +66,7 @@ contract ParaSwapRepayAdapter is
 
     IERC20Detailed collateralAsset = IERC20Detailed(asset);
 
-    _swapAndRepay(
-      params,
-      premium,
-      initiatorLocal,
-      collateralAsset,
-      collateralAmount
-    );
+    _swapAndRepay(params, premium, initiatorLocal, collateralAsset, collateralAmount);
 
     return true;
   }
@@ -113,12 +104,7 @@ contract ParaSwapRepayAdapter is
     );
 
     // Pull aTokens from user
-    _pullATokenAndWithdraw(
-      address(collateralAsset),
-      msg.sender,
-      collateralAmount,
-      permitSignature
-    );
+    _pullATokenAndWithdraw(address(collateralAsset), msg.sender, collateralAmount, permitSignature);
     //buy debt asset using collateral asset
     uint256 amountSold = _buyOnParaSwap(
       buyAllBalanceOffset,
@@ -135,12 +121,7 @@ contract ParaSwapRepayAdapter is
     if (collateralBalanceLeft > 0) {
       IERC20(collateralAsset).approve(address(POOL), 0);
       IERC20(collateralAsset).approve(address(POOL), collateralBalanceLeft);
-      POOL.deposit(
-        address(collateralAsset),
-        collateralBalanceLeft,
-        msg.sender,
-        0
-      );
+      POOL.deposit(address(collateralAsset), collateralBalanceLeft, msg.sender, 0);
     }
 
     // Repay debt. Approves 0 first to comply with tokens that implement the anti frontrunning approval fix
@@ -171,10 +152,7 @@ contract ParaSwapRepayAdapter is
       uint256 rateMode,
       bytes memory paraswapData,
       PermitSignature memory permitSignature
-    ) = abi.decode(
-        params,
-        (IERC20Detailed, uint256, uint256, uint256, bytes, PermitSignature)
-      );
+    ) = abi.decode(params, (IERC20Detailed, uint256, uint256, uint256, bytes, PermitSignature));
 
     debtRepayAmount = getDebtRepayAmount(
       debtAsset,
@@ -210,10 +188,7 @@ contract ParaSwapRepayAdapter is
 
     // Repay flashloan. Approves for 0 first to comply with tokens that implement the anti frontrunning approval fix.
     IERC20(collateralAsset).approve(address(POOL), 0);
-    IERC20(collateralAsset).approve(
-      address(POOL),
-      collateralAmount.add(premium)
-    );
+    IERC20(collateralAsset).approve(address(POOL), collateralAmount.add(premium));
   }
 
   function getDebtRepayAmount(
@@ -223,12 +198,9 @@ contract ParaSwapRepayAdapter is
     uint256 debtRepayAmount,
     address initiator
   ) private view returns (uint256) {
-    DataTypes.ReserveData memory debtReserveData = _getReserveData(
-      address(debtAsset)
-    );
+    DataTypes.ReserveData memory debtReserveData = _getReserveData(address(debtAsset));
 
-    address debtToken = DataTypes.InterestRateMode(rateMode) ==
-      DataTypes.InterestRateMode.STABLE
+    address debtToken = DataTypes.InterestRateMode(rateMode) == DataTypes.InterestRateMode.STABLE
       ? debtReserveData.stableDebtTokenAddress
       : debtReserveData.variableDebtTokenAddress;
 

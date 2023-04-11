@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: agpl-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
 import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeMath.sol';
@@ -21,13 +21,11 @@ abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
 
   constructor(
     IPoolAddressesProvider addressesProvider,
+    address pool,
     IParaSwapAugustusRegistry augustusRegistry
-  ) BaseParaSwapAdapter(addressesProvider) {
+  ) BaseParaSwapAdapter(addressesProvider, pool) {
     // Do something on Augustus registry to check the right contract was passed
-    require(
-      !augustusRegistry.isValidAugustus(address(0)),
-      'Not a valid Augustus address'
-    );
+    require(!augustusRegistry.isValidAugustus(address(0)), 'Not a valid Augustus address');
     AUGUSTUS_REGISTRY = augustusRegistry;
   }
 
@@ -54,10 +52,7 @@ abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
       (bytes, IParaSwapAugustus)
     );
 
-    require(
-      AUGUSTUS_REGISTRY.isValidAugustus(address(augustus)),
-      'INVALID_AUGUSTUS'
-    );
+    require(AUGUSTUS_REGISTRY.isValidAugustus(address(augustus)), 'INVALID_AUGUSTUS');
 
     {
       uint256 fromAssetDecimals = _getDecimals(assetToSwapFrom);
@@ -71,17 +66,11 @@ abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
         .div(fromAssetPrice.mul(10 ** toAssetDecimals))
         .percentMul(PercentageMath.PERCENTAGE_FACTOR.add(MAX_SLIPPAGE_PERCENT));
 
-      require(
-        maxAmountToSwap <= expectedMaxAmountToSwap,
-        'maxAmountToSwap exceed max slippage'
-      );
+      require(maxAmountToSwap <= expectedMaxAmountToSwap, 'maxAmountToSwap exceed max slippage');
     }
 
     uint256 balanceBeforeAssetFrom = assetToSwapFrom.balanceOf(address(this));
-    require(
-      balanceBeforeAssetFrom >= maxAmountToSwap,
-      'INSUFFICIENT_BALANCE_BEFORE_SWAP'
-    );
+    require(balanceBeforeAssetFrom >= maxAmountToSwap, 'INSUFFICIENT_BALANCE_BEFORE_SWAP');
     uint256 balanceBeforeAssetTo = assetToSwapTo.balanceOf(address(this));
 
     address tokenTransferProxy = augustus.getTokenTransferProxy();
@@ -114,16 +103,9 @@ abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
     uint256 balanceAfterAssetFrom = assetToSwapFrom.balanceOf(address(this));
     amountSold = balanceBeforeAssetFrom - balanceAfterAssetFrom;
     require(amountSold <= maxAmountToSwap, 'WRONG_BALANCE_AFTER_SWAP');
-    uint256 amountReceived = assetToSwapTo.balanceOf(address(this)).sub(
-      balanceBeforeAssetTo
-    );
+    uint256 amountReceived = assetToSwapTo.balanceOf(address(this)).sub(balanceBeforeAssetTo);
     require(amountReceived >= amountToReceive, 'INSUFFICIENT_AMOUNT_RECEIVED');
 
-    emit Bought(
-      address(assetToSwapFrom),
-      address(assetToSwapTo),
-      amountSold,
-      amountReceived
-    );
+    emit Bought(address(assetToSwapFrom), address(assetToSwapTo), amountSold, amountReceived);
   }
 }

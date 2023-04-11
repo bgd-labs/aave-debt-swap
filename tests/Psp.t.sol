@@ -43,16 +43,19 @@ contract PspTest is Test {
     vm.createSelectFork(vm.rpcUrl('polygon'), 41025740);
     lqSwapAdapter = new ParaSwapLiquiditySwapAdapter(
       IPoolAddressesProvider(address(AaveV3Polygon.POOL_ADDRESSES_PROVIDER)),
+      address(AaveV3Polygon.POOL),
       AugustusRegistry.POLYGON,
       AaveV3Polygon.ACL_ADMIN
     );
     repayAdapter = new ParaSwapRepayAdapter(
       IPoolAddressesProvider(address(AaveV3Polygon.POOL_ADDRESSES_PROVIDER)),
+      address(AaveV3Polygon.POOL),
       AugustusRegistry.POLYGON,
       AaveV3Polygon.ACL_ADMIN
     );
     debtSwapAdapter = new ParaSwapDebtSwapAdapter(
       IPoolAddressesProvider(address(AaveV3Polygon.POOL_ADDRESSES_PROVIDER)),
+      address(AaveV3Polygon.POOL),
       AugustusRegistry.POLYGON,
       AaveV3Polygon.ACL_ADMIN
     );
