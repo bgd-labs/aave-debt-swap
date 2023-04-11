@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: agpl-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
@@ -70,14 +70,7 @@ contract ParaSwapLiquiditySwapAdapter is
       PermitSignature memory permitParams
     ) = abi.decode(
         params,
-        (
-          IERC20Detailed,
-          uint256,
-          uint256,
-          bytes,
-          IParaSwapAugustus,
-          PermitSignature
-        )
+        (IERC20Detailed, uint256, uint256, bytes, IParaSwapAugustus, PermitSignature)
       );
 
     _swapLiquidity(
@@ -188,10 +181,7 @@ contract ParaSwapLiquiditySwapAdapter is
       require(balanceToSwap <= amountToSwap, 'INSUFFICIENT_AMOUNT_TO_SWAP');
       amountToSwap = balanceToSwap;
     } else {
-      require(
-        balance >= amountToSwap.add(premium),
-        'INSUFFICIENT_ATOKEN_BALANCE'
-      );
+      require(balance >= amountToSwap.add(premium), 'INSUFFICIENT_ATOKEN_BALANCE');
     }
 
     uint256 amountReceived = _sellOnParaSwap(

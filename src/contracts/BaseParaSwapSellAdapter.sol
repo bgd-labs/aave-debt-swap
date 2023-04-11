@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: agpl-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
 import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeMath.sol';
@@ -49,10 +49,7 @@ abstract contract BaseParaSwapSellAdapter is BaseParaSwapAdapter {
     uint256 amountToSwap,
     uint256 minAmountToReceive
   ) internal returns (uint256 amountReceived) {
-    require(
-      AUGUSTUS_REGISTRY.isValidAugustus(address(augustus)),
-      'INVALID_AUGUSTUS'
-    );
+    require(AUGUSTUS_REGISTRY.isValidAugustus(address(augustus)), 'INVALID_AUGUSTUS');
 
     {
       uint256 fromAssetDecimals = _getDecimals(assetToSwapFrom);
@@ -66,17 +63,11 @@ abstract contract BaseParaSwapSellAdapter is BaseParaSwapAdapter {
         .div(toAssetPrice.mul(10 ** fromAssetDecimals))
         .percentMul(PercentageMath.PERCENTAGE_FACTOR - MAX_SLIPPAGE_PERCENT);
 
-      require(
-        expectedMinAmountOut <= minAmountToReceive,
-        'MIN_AMOUNT_EXCEEDS_MAX_SLIPPAGE'
-      );
+      require(expectedMinAmountOut <= minAmountToReceive, 'MIN_AMOUNT_EXCEEDS_MAX_SLIPPAGE');
     }
 
     uint256 balanceBeforeAssetFrom = assetToSwapFrom.balanceOf(address(this));
-    require(
-      balanceBeforeAssetFrom >= amountToSwap,
-      'INSUFFICIENT_BALANCE_BEFORE_SWAP'
-    );
+    require(balanceBeforeAssetFrom >= amountToSwap, 'INSUFFICIENT_BALANCE_BEFORE_SWAP');
     uint256 balanceBeforeAssetTo = assetToSwapTo.balanceOf(address(this));
 
     address tokenTransferProxy = augustus.getTokenTransferProxy();
@@ -87,8 +78,7 @@ abstract contract BaseParaSwapSellAdapter is BaseParaSwapAdapter {
       // Ensure 256 bit (32 bytes) fromAmount value is within bounds of the
       // calldata, not overlapping with the first 4 bytes (function selector).
       require(
-        fromAmountOffset >= 4 &&
-          fromAmountOffset <= swapCalldata.length.sub(32),
+        fromAmountOffset >= 4 && fromAmountOffset <= swapCalldata.length.sub(32),
         'FROM_AMOUNT_OFFSET_OUT_OF_RANGE'
       );
       // Overwrite the fromAmount with the correct amount for the swap.
@@ -107,23 +97,12 @@ abstract contract BaseParaSwapSellAdapter is BaseParaSwapAdapter {
       }
     }
     require(
-      assetToSwapFrom.balanceOf(address(this)) ==
-        balanceBeforeAssetFrom - amountToSwap,
+      assetToSwapFrom.balanceOf(address(this)) == balanceBeforeAssetFrom - amountToSwap,
       'WRONG_BALANCE_AFTER_SWAP'
     );
-    amountReceived = assetToSwapTo.balanceOf(address(this)).sub(
-      balanceBeforeAssetTo
-    );
-    require(
-      amountReceived >= minAmountToReceive,
-      'INSUFFICIENT_AMOUNT_RECEIVED'
-    );
+    amountReceived = assetToSwapTo.balanceOf(address(this)).sub(balanceBeforeAssetTo);
+    require(amountReceived >= minAmountToReceive, 'INSUFFICIENT_AMOUNT_RECEIVED');
 
-    emit Swapped(
-      address(assetToSwapFrom),
-      address(assetToSwapTo),
-      amountToSwap,
-      amountReceived
-    );
+    emit Swapped(address(assetToSwapFrom), address(assetToSwapTo), amountToSwap, amountReceived);
   }
 }
