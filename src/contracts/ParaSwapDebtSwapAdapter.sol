@@ -25,7 +25,8 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
   using SafeERC20 for IERC20WithPermit;
   using SafeMath for uint256;
 
-  uint16 constant REFERRER = 100;
+  // unique identifier to track usage via flashloan events
+  uint16 public constant REFERRER = 5936; // uint16(uint256(keccak256(abi.encode('debt-swap-adapter'))) / type(uint16).max)
 
   constructor(
     IPoolAddressesProvider addressesProvider,
