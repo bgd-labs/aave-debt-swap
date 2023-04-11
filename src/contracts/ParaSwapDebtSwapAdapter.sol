@@ -19,7 +19,7 @@ import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
 /**
  * @title ParaSwapDebtSwapAdapter
  * @notice ParaSwap Adapter to perform a swap of debt to another debt.
- * @author BGD
+ * @author BGD labs
  **/
 contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFlashLoanReceiver {
   using SafeERC20 for IERC20WithPermit;
@@ -93,7 +93,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     uint256 excessBefore = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     // delegate credit
     if (creditDelegationPermit.deadline != 0) {
-      ICreditDelegationToken(debtSwapParams.newDebtAsset).delegationWithSig(
+      ICreditDelegationToken(creditDelegationPermit.debtToken).delegationWithSig(
         msg.sender,
         address(this),
         creditDelegationPermit.value,
@@ -161,19 +161,19 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     require(msg.sender == address(POOL), 'CALLER_MUST_BE_POOL');
     require(initiator == address(this), 'INITIATOR_MUST_BE_THIS');
 
-    _swapAndRepay(params, initiator, IERC20Detailed(assets[0]), amounts[0]);
+    _swapAndRepay(params, IERC20Detailed(assets[0]), amounts[0]);
 
     return true;
   }
 
   /**
    * @dev Swaps the flashed token to the debt token & repays the debt.
+   * @param params Encoded swap parameters
    * @param newDebtAsset Address of token to be swapped
    * @param newDebtAmount Amount of the reserve to be swapped(flash loan amount)
    */
   function _swapAndRepay(
     bytes calldata params,
-    address,
     IERC20Detailed newDebtAsset,
     uint256 newDebtAmount
   ) private {
