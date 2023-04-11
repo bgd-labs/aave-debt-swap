@@ -3,17 +3,17 @@
 This repository contains the [ParaSwapDebtSwapAdapter](./src/contracts/ParaSwapDebtSwapAdapter.sol), which aims to allow users to arbitrage borrow apy and exit illiquid debt positions.
 Therefore this contract is able to swap one debt position to another debt position - either partially or complete.
 
+You could for example swap your `1000 BUSD` debt to `max(1010 USDC)` debt.
 In order to perform this task, `swapDebt`:
 
-1. creates a flashLoan with variable debt mode with the **target debt** on behalf of the user
+1. creates a flashLoan with variable debt mode with the **target debt**(`1010 USDC`) on behalf of the user
    - on aave v2 you need to approve the debtSwapAdapter for credit delegation
    - on aave v3 you can also pass a permit
-2. swaps the flashed assets to the underlying of the **current debt** via exact out swap
-3. repays the **current debt**
-4. uses potential excess to repay parts of the newly created **target debt**
+2. it then swaps the flashed assets to the underlying of the **current debt**(`1000 BUSD`) via exact out swap (meaning it will receive `1000 BUSD`, but might only need `1000.1 USDC` for the swap)
+3. repays the **current debt** (`1000 BUSD`)
+4. uses potential (`9.9 USDC`) to repay parts of the newly created **target debt**
 
-The ParaSwapDebtSwapAdapter will always repay on the pool on behalf of the user.
-So instead of having approvals per transaction the adapter will approve `type(uint256).max` once to reduce gas consumption.
+The user has now payed off his `1000 BUSD` debt position, and created a new `1000.1 USDC` debt position.
 
 The `function swapDebt( DebtSwapParams memory debtSwapParams, CreditDelegationInput memory creditDelegationPermit )` expects two parameters.
 
@@ -46,6 +46,26 @@ struct CreditDelegationInput {
 ```
 
 For usage examples please check the [tests](./tests/).
+
+## Security
+
+- This contract is a extra layer on top of [BaseParaswapBuyAdapter](./src/contracts/BaseParaSwapBuyAdapter.sol) which is used in production for [ParaSwapRepayAdapter](https://github.com/aave/aave-v3-periphery/blob/master/contracts/adapters/paraswap/ParaSwapRepayAdapter.sol). It uses the exact same mechanism for exact out swap.
+
+- In contrast to ParaSwapRepayAdapter the ParaSwapDebtSwapAdapter will always repay on the pool on behalf of the user. So instead of having approvals per transaction the adapter will approve `type(uint256).max` once to reduce gas consumption.
+
+- The Aave `POOL` is considered a trustable entity for allowance purposes.
+
+- The contract only interact with `msg.sender` and therefore ensures isolation between users.
+
+- The contract is not upgradable.
+
+- The contract is ownable and will be owned by governance, so the governance will be the only entity able to call `tokenRescue`.
+
+- The approach with credit delegation and borrow-mode flashLoans is very similar to what is done on [V2-V3 Migration helper](https://github.com/bgd-labs/V2-V3-migration-helpers)
+
+- The contract inherits the security and limitations of Aave v2/v3. The contract itself does not validate for frozen/inactive reserves and also does not consider isolation/eMode or borrowCaps. It is the responsibility of the interface integrating this contract to correctly handle all user position compositions and pool configurations.
+
+- The contract implements an upper bound of 30% price impact, which would revert any swap. The slippage has to be properly configured in incorporated into the `DebtSwapParams.maxNewDebt` parameter.
 
 ## Install
 
