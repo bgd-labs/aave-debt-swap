@@ -76,7 +76,6 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     uint256 debtRateMode;
     address newDebtAsset;
     uint256 maxNewDebtAmount;
-    uint256 newDebtRateMode;
     bytes paraswapData;
   }
 
@@ -134,7 +133,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     uint256[] memory amounts = new uint256[](1);
     amounts[0] = debtSwapParams.maxNewDebtAmount;
     uint256[] memory interestRateModes = new uint256[](1);
-    interestRateModes[0] = debtSwapParams.newDebtRateMode;
+    interestRateModes[0] = 2;
     POOL.flashLoan(address(this), assets, amounts, interestRateModes, msg.sender, params, REFERRER);
 
     // use excess to repay parts of flash debt
@@ -148,7 +147,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
       if (allowance < excess) {
         renewAllowance(debtSwapParams.newDebtAsset);
       }
-      POOL.repay(debtSwapParams.newDebtAsset, excess, debtSwapParams.newDebtRateMode, msg.sender);
+      POOL.repay(debtSwapParams.newDebtAsset, excess, 2, msg.sender);
     }
   }
 

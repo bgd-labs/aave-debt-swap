@@ -9,7 +9,7 @@ import {ICreditDelegationToken} from '../src/interfaces/ICreditDelegationToken.s
 import {ParaSwapDebtSwapAdapter} from '../src/contracts/ParaSwapDebtSwapAdapter.sol';
 import {AugustusRegistry} from '../src/lib/AugustusRegistry.sol';
 
-contract DebtSwapTest is BaseTest {
+contract DebtSwapV3Test is BaseTest {
   ParaSwapDebtSwapAdapter internal debtSwapAdapter;
 
   function setUp() public override {
@@ -60,7 +60,6 @@ contract DebtSwapTest is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        newDebtRateMode: 2,
         paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });
 
@@ -110,7 +109,6 @@ contract DebtSwapTest is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        newDebtRateMode: 2,
         paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });
 
