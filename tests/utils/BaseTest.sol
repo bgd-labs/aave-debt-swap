@@ -35,7 +35,7 @@ contract BaseTest is Test {
     bool sell,
     bool max
   ) internal returns (PsPResponse memory) {
-    string[] memory inputs = new string[](12);
+    string[] memory inputs = new string[](13);
     inputs[0] = 'node';
     inputs[1] = './scripts/psp.js';
     inputs[2] = vm.toString(block.chainid);
@@ -48,6 +48,8 @@ contract BaseTest is Test {
     inputs[9] = vm.toString(max);
     inputs[10] = vm.toString(IERC20Detailed(from).decimals());
     inputs[11] = vm.toString(IERC20Detailed(to).decimals());
+    inputs[12] = vm.toString(block.number);
+
     bytes memory res = vm.ffi(inputs);
     return abi.decode(res, (PsPResponse));
   }

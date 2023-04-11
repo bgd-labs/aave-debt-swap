@@ -6,6 +6,9 @@ const {
 const axios = require("axios");
 const { BigNumber } = require("ethers");
 const { defaultAbiCoder } = require("ethers/lib/utils");
+const objectHash = require("object-hash");
+const fs = require("fs");
+const path = require("path");
 
 const args = process.argv.slice(2);
 
@@ -19,6 +22,9 @@ const MAX_SLIPPAGE = Number(args[6]);
 const MAX = args[7] === "true";
 const FROM_DECIMALS = Number(args[8]);
 const TO_DECIMALS = Number(args[9]);
+const BLOCK_NUMBER = Number(args[10]);
+
+const hash = objectHash(args);
 
 const paraSwapMin = constructSimpleSDK({ chainId: CHAIN_ID, axios });
 
@@ -68,6 +74,12 @@ const augustusToAmountOffsetFromCalldata = (calldata) => {
 };
 
 async function main(from, to, method, amount, user) {
+  const filePath = path.join(process.cwd(), "tests/pspcache", hash);
+  if (fs.existsSync(filePath)) {
+    const file = fs.readFileSync(filePath);
+    process.stdout.write(file);
+    return;
+  }
   const excludedMethod =
     method === "SELL" ? ContractMethod.simpleSwap : ContractMethod.simpleBuy;
   const priceRoute = await paraSwapMin.swap.getRate({
@@ -126,6 +138,7 @@ async function main(from, to, method, amount, user) {
     [[txParams.to, txParams.data, srcAmount, destAmount, offset]]
   );
 
+  fs.writeFileSync(filePath, encodedData);
   process.stdout.write(encodedData);
 }
 main(FROM, TO, METHOD, AMOUNT, USER_ADDRESS);
