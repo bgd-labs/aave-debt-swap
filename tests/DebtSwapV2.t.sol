@@ -19,6 +19,7 @@ contract DebtSwapV2Test is BaseTest {
 
     debtSwapAdapter = new ParaSwapDebtSwapAdapter(
       IPoolAddressesProvider(address(AaveV2Ethereum.POOL_ADDRESSES_PROVIDER)),
+      address(AaveV2Ethereum.POOL),
       AugustusRegistry.ETHEREUM,
       AaveGovernanceV2.SHORT_EXECUTOR
     );

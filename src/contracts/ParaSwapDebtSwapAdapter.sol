@@ -29,9 +29,10 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
 
   constructor(
     IPoolAddressesProvider addressesProvider,
+    address pool,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
-  ) BaseParaSwapBuyAdapter(addressesProvider, augustusRegistry) {
+  ) BaseParaSwapBuyAdapter(addressesProvider, pool, augustusRegistry) {
     transferOwnership(owner);
     cacheReserves();
   }

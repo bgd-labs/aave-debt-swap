@@ -52,10 +52,10 @@ abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
     uint256 receivedAmount
   );
 
-  constructor(IPoolAddressesProvider addressesProvider) {
+  constructor(IPoolAddressesProvider addressesProvider, address pool) {
     ORACLE = IPriceOracleGetter(addressesProvider.getPriceOracle());
     ADDRESSES_PROVIDER = addressesProvider;
-    POOL = IPool(addressesProvider.getPool());
+    POOL = IPool(pool);
   }
 
   /**

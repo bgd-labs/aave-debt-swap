@@ -23,9 +23,10 @@ contract ParaSwapRepayAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFlash
 
   constructor(
     IPoolAddressesProvider addressesProvider,
+    address pool,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
-  ) BaseParaSwapBuyAdapter(addressesProvider, augustusRegistry) {
+  ) BaseParaSwapBuyAdapter(addressesProvider, pool, augustusRegistry) {
     transferOwnership(owner);
   }
 

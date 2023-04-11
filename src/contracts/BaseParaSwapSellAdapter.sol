@@ -22,8 +22,9 @@ abstract contract BaseParaSwapSellAdapter is BaseParaSwapAdapter {
 
   constructor(
     IPoolAddressesProvider addressesProvider,
+    address pool,
     IParaSwapAugustusRegistry augustusRegistry
-  ) BaseParaSwapAdapter(addressesProvider) {
+  ) BaseParaSwapAdapter(addressesProvider, pool) {
     // Do something on Augustus registry to check the right contract was passed
     require(!augustusRegistry.isValidAugustus(address(0)));
     AUGUSTUS_REGISTRY = augustusRegistry;

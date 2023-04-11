@@ -25,9 +25,10 @@ contract ParaSwapLiquiditySwapAdapter is
 
   constructor(
     IPoolAddressesProvider addressesProvider,
+    address pool,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
-  ) BaseParaSwapSellAdapter(addressesProvider, augustusRegistry) {
+  ) BaseParaSwapSellAdapter(addressesProvider, pool, augustusRegistry) {
     transferOwnership(owner);
   }
 
