@@ -4,13 +4,13 @@ pragma solidity ^0.8.0;
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
 import {AaveGovernanceV2} from 'aave-address-book/AaveGovernanceV2.sol';
-import {AaveV3Ethereum, AaveV3EthereumAssets, IPool} from 'aave-address-book/AaveV3Ethereum.sol';
+import {AaveV2Ethereum, AaveV2EthereumAssets, ILendingPool} from 'aave-address-book/AaveV2Ethereum.sol';
 import {BaseTest} from './utils/BaseTest.sol';
 import {ICreditDelegationToken} from '../src/interfaces/ICreditDelegationToken.sol';
 import {ParaSwapDebtSwapAdapter} from '../src/contracts/ParaSwapDebtSwapAdapter.sol';
 import {AugustusRegistry} from '../src/lib/AugustusRegistry.sol';
 
-contract DebtSwapV3Test is BaseTest {
+contract DebtSwapV2Test is BaseTest {
   ParaSwapDebtSwapAdapter internal debtSwapAdapter;
 
   function setUp() public override {
@@ -18,7 +18,7 @@ contract DebtSwapV3Test is BaseTest {
     vm.createSelectFork(vm.rpcUrl('mainnet'), 16956285);
 
     debtSwapAdapter = new ParaSwapDebtSwapAdapter(
-      IPoolAddressesProvider(address(AaveV3Ethereum.POOL_ADDRESSES_PROVIDER)),
+      IPoolAddressesProvider(address(AaveV2Ethereum.POOL_ADDRESSES_PROVIDER)),
       AugustusRegistry.ETHEREUM,
       AaveGovernanceV2.SHORT_EXECUTOR
     );
@@ -31,16 +31,16 @@ contract DebtSwapV3Test is BaseTest {
    */
   function test_debtSwap_swapHalf() public {
     vm.startPrank(user);
-    address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
-    address debtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
-    address newDebtAsset = AaveV3EthereumAssets.LUSD_UNDERLYING;
-    address newDebtToken = AaveV3EthereumAssets.LUSD_V_TOKEN;
+    address debtAsset = AaveV2EthereumAssets.DAI_UNDERLYING;
+    address debtToken = AaveV2EthereumAssets.DAI_V_TOKEN;
+    address newDebtAsset = AaveV2EthereumAssets.LUSD_UNDERLYING;
+    address newDebtToken = AaveV2EthereumAssets.LUSD_V_TOKEN;
 
     uint256 supplyAmount = 200000 ether;
     uint256 borrowAmount = 100 ether;
 
-    _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
-    _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
+    _supply(AaveV2Ethereum.POOL, supplyAmount, debtAsset);
+    _borrow(AaveV2Ethereum.POOL, borrowAmount, debtAsset);
 
     uint256 repayAmount = borrowAmount / 2;
     PsPResponse memory psp = _fetchPSPRoute(
@@ -77,16 +77,16 @@ contract DebtSwapV3Test is BaseTest {
 
   function test_debtSwap_swapAll() public {
     vm.startPrank(user);
-    address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
-    address debtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
-    address newDebtAsset = AaveV3EthereumAssets.LUSD_UNDERLYING;
-    address newDebtToken = AaveV3EthereumAssets.LUSD_V_TOKEN;
+    address debtAsset = AaveV2EthereumAssets.DAI_UNDERLYING;
+    address debtToken = AaveV2EthereumAssets.DAI_V_TOKEN;
+    address newDebtAsset = AaveV2EthereumAssets.LUSD_UNDERLYING;
+    address newDebtToken = AaveV2EthereumAssets.LUSD_V_TOKEN;
 
     uint256 supplyAmount = 200000 ether;
     uint256 borrowAmount = 100 ether;
 
-    _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
-    _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
+    _supply(AaveV2Ethereum.POOL, supplyAmount, debtAsset);
+    _borrow(AaveV2Ethereum.POOL, borrowAmount, debtAsset);
 
     skip(1000);
 
@@ -124,13 +124,13 @@ contract DebtSwapV3Test is BaseTest {
     assertLe(vNEWDEBT_TOKENBalanceAfter, psp.srcAmount);
   }
 
-  function _supply(IPool pool, uint256 amount, address asset) internal {
+  function _supply(ILendingPool pool, uint256 amount, address asset) internal {
     deal(asset, user, amount);
     IERC20Detailed(asset).approve(address(pool), amount);
-    pool.supply(asset, amount, user, 0);
+    pool.deposit(asset, amount, user, 0);
   }
 
-  function _borrow(IPool pool, uint256 amount, address asset) internal {
+  function _borrow(ILendingPool pool, uint256 amount, address asset) internal {
     pool.borrow(asset, amount, 2, 0, user);
   }
 }

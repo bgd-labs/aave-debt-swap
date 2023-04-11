@@ -51,14 +51,4 @@ contract BaseTest is Test {
     bytes memory res = vm.ffi(inputs);
     return abi.decode(res, (PsPResponse));
   }
-
-  function _supply(IPool pool, uint256 amount, address asset) internal {
-    deal(asset, user, amount);
-    IERC20Detailed(asset).approve(address(pool), amount);
-    pool.supply(asset, amount, user, 0);
-  }
-
-  function _borrow(IPool pool, uint256 amount, address asset) internal {
-    pool.borrow(asset, amount, 2, 0, user);
-  }
 }
