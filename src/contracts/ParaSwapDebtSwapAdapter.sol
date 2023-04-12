@@ -185,7 +185,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     FlashParams memory swapParams = abi.decode(params, (FlashParams));
 
     _buyOnParaSwap(
-      0,
+      swapParams.offset,
       swapParams.paraswapData,
       newDebtAsset,
       IERC20Detailed(swapParams.debtAsset),
