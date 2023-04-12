@@ -64,7 +64,8 @@ contract DebtSwapV3Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
+        offset: psp.offset
       });
 
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
@@ -99,7 +100,7 @@ contract DebtSwapV3Test is BaseTest {
       repayAmount,
       user,
       false,
-      false
+      true
     );
 
     skip(1 hours);
@@ -113,7 +114,8 @@ contract DebtSwapV3Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
+        offset: psp.offset
       });
 
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
@@ -148,7 +150,7 @@ contract DebtSwapV3Test is BaseTest {
       repayAmount,
       user,
       false,
-      false
+      true
     );
 
     skip(1000);
@@ -160,7 +162,8 @@ contract DebtSwapV3Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
+        offset: psp.offset
       });
 
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
