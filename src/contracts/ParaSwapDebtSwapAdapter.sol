@@ -58,6 +58,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     uint256 debtRepayAmount;
     uint256 debtRateMode;
     bytes paraswapData;
+    uint256 offset;
     address user;
   }
 
@@ -67,6 +68,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     uint256 debtRateMode;
     address newDebtAsset;
     uint256 maxNewDebtAmount;
+    uint256 offset;
     bytes paraswapData;
   }
 
@@ -117,6 +119,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
       debtSwapParams.debtRepayAmount,
       debtSwapParams.debtRateMode,
       debtSwapParams.paraswapData,
+      debtSwapParams.offset,
       msg.sender
     );
     bytes memory params = abi.encode(flashParams);

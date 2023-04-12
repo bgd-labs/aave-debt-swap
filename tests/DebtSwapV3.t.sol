@@ -64,7 +64,8 @@ contract DebtSwapV3Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
+        offset: psp.offset
       });
 
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
@@ -91,8 +92,6 @@ contract DebtSwapV3Test is BaseTest {
     _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
     _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
 
-    skip(1000);
-
     // add some margin to account for accumulated debt
     uint256 repayAmount = (borrowAmount * 101) / 100;
     PsPResponse memory psp = _fetchPSPRoute(
@@ -101,19 +100,22 @@ contract DebtSwapV3Test is BaseTest {
       repayAmount,
       user,
       false,
-      false
+      true
     );
+
+    skip(1 hours);
 
     ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
 
     ParaSwapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = ParaSwapDebtSwapAdapter
       .DebtSwapParams({
         debtAsset: debtAsset,
-        debtRepayAmount: repayAmount,
+        debtRepayAmount: type(uint256).max,
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
+        offset: psp.offset
       });
 
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
@@ -140,8 +142,6 @@ contract DebtSwapV3Test is BaseTest {
     _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
     _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
 
-    skip(1000);
-
     // add some margin to account for accumulated debt
     uint256 repayAmount = (borrowAmount * 101) / 100;
     PsPResponse memory psp = _fetchPSPRoute(
@@ -150,17 +150,20 @@ contract DebtSwapV3Test is BaseTest {
       repayAmount,
       user,
       false,
-      false
+      true
     );
+
+    skip(1000);
 
     ParaSwapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = ParaSwapDebtSwapAdapter
       .DebtSwapParams({
         debtAsset: debtAsset,
-        debtRepayAmount: repayAmount,
+        debtRepayAmount: type(uint256).max,
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
+        offset: psp.offset
       });
 
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
