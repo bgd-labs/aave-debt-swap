@@ -1,17 +1,17 @@
 # BGD labs <> Aave Debt Swap Adapter
 
-This repository contains the [ParaSwapDebtSwapAdapter](./src/contracts/ParaSwapDebtSwapAdapter.sol), which aims to allow users to arbitrage borrow apy and exit illiquid debt positions.
+This repository contains the [ParaSwapDebtSwapAdapter](./src/contracts/ParaSwapDebtSwapAdapter.sol), which aims to allow users to arbitrage borrow APY and exit illiquid debt positions.
 Therefore this contract is able to swap one debt position to another debt position - either partially or complete.
 
 You could for example swap your `1000 BUSD` debt to `max(1010 USDC)` debt.
 In order to perform this task, `swapDebt`:
 
-1. creates a flashLoan with variable debt mode with the **target debt**(`1010 USDC`) on behalf of the user
-   - on aave v2 you need to approve the debtSwapAdapter for credit delegation
-   - on aave v3 you can also pass a permit
-2. it then swaps the flashed assets to the underlying of the **current debt**(`1000 BUSD`) via exact out swap (meaning it will receive `1000 BUSD`, but might only need `1000.1 USDC` for the swap)
-3. repays the **current debt** (`1000 BUSD`)
-4. uses potential (`9.9 USDC`) to repay parts of the newly created **target debt**
+1. Creates a flashLoan with variable debt mode with the **target debt**(`1010 USDC`) on behalf of the user
+   - On aave v2 you need to approve the debtSwapAdapter for credit delegation
+   - On aave v3 you can also pass a permit
+2. It then swaps the flashed assets to the underlying of the **current debt**(`1000 BUSD`) via exact out swap (meaning it will receive `1000 BUSD`, but might only need `1000.1 USDC` for the swap)
+3. Repays the **current debt** (`1000 BUSD`)
+4. Uses potential (`9.9 USDC`) to repay parts of the newly created **target debt**
 
 The user has now payed off his `1000 BUSD` debt position, and created a new `1000.1 USDC` debt position.
 
