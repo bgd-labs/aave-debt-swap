@@ -21,7 +21,11 @@ import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
  * @notice ParaSwap Adapter to perform a swap of debt to another debt.
  * @author BGD labs
  **/
-contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFlashLoanReceiver {
+abstract contract ParaSwapDebtSwapAdapter is
+  BaseParaSwapBuyAdapter,
+  ReentrancyGuard,
+  IFlashLoanReceiver
+{
   using SafeERC20 for IERC20WithPermit;
   using SafeMath for uint256;
 
@@ -109,10 +113,10 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     }
     // flash & repay
     if (debtSwapParams.debtRepayAmount == type(uint256).max) {
-      DataTypes.ReserveData memory reserveData = POOL.getReserveData(debtSwapParams.debtAsset);
+      (address vToken, address sToken) = _getReserveData(debtSwapParams.debtAsset);
       debtSwapParams.debtRepayAmount = debtSwapParams.debtRateMode == 2
-        ? IERC20WithPermit(reserveData.variableDebtTokenAddress).balanceOf(msg.sender)
-        : IERC20WithPermit(reserveData.stableDebtTokenAddress).balanceOf(msg.sender);
+        ? IERC20WithPermit(vToken).balanceOf(msg.sender)
+        : IERC20WithPermit(sToken).balanceOf(msg.sender);
     }
     FlashParams memory flashParams = FlashParams(
       debtSwapParams.debtAsset,
@@ -185,7 +189,7 @@ contract ParaSwapDebtSwapAdapter is BaseParaSwapBuyAdapter, ReentrancyGuard, IFl
     FlashParams memory swapParams = abi.decode(params, (FlashParams));
 
     _buyOnParaSwap(
-      0,
+      swapParams.offset,
       swapParams.paraswapData,
       newDebtAsset,
       IERC20Detailed(swapParams.debtAsset),

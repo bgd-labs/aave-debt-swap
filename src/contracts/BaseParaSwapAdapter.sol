@@ -79,59 +79,11 @@ abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
   }
 
   /**
-   * @dev Get the aToken associated to the asset
-   * @return address of the aToken
+   * @dev Get the vToken, sToken associated to the asset
+   * @return address of the vToken
+   * @return address of the sToken
    */
-  function _getReserveData(address asset) internal view returns (DataTypes.ReserveData memory) {
-    return POOL.getReserveData(asset);
-  }
-
-  function _pullATokenAndWithdraw(
-    address reserve,
-    address user,
-    uint256 amount,
-    PermitSignature memory permitSignature
-  ) internal {
-    IERC20WithPermit reserveAToken = IERC20WithPermit(
-      _getReserveData(address(reserve)).aTokenAddress
-    );
-    _pullATokenAndWithdraw(reserve, reserveAToken, user, amount, permitSignature);
-  }
-
-  /**
-   * @dev Pull the ATokens from the user
-   * @param reserve address of the asset
-   * @param reserveAToken address of the aToken of the reserve
-   * @param user address
-   * @param amount of tokens to be transferred to the contract
-   * @param permitSignature struct containing the permit signature
-   */
-  function _pullATokenAndWithdraw(
-    address reserve,
-    IERC20WithPermit reserveAToken,
-    address user,
-    uint256 amount,
-    PermitSignature memory permitSignature
-  ) internal {
-    // If deadline is set to zero, assume there is no signature for permit
-    if (permitSignature.deadline != 0) {
-      reserveAToken.permit(
-        user,
-        address(this),
-        permitSignature.amount,
-        permitSignature.deadline,
-        permitSignature.v,
-        permitSignature.r,
-        permitSignature.s
-      );
-    }
-
-    // transfer from user to adapter
-    reserveAToken.safeTransferFrom(user, address(this), amount);
-
-    // withdraw reserve
-    require(POOL.withdraw(reserve, amount, address(this)) == amount, 'UNEXPECTED_AMOUNT_WITHDRAWN');
-  }
+  function _getReserveData(address asset) internal view virtual returns (address, address);
 
   /**
    * @dev Emergency rescue for token stucked on this contract, as failsafe mechanism
