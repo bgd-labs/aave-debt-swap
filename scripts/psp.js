@@ -22,12 +22,15 @@ const MAX_SLIPPAGE = Number(args[6]);
 const MAX = args[7] === "true";
 const FROM_DECIMALS = Number(args[8]);
 const TO_DECIMALS = Number(args[9]);
-const BLOCK_NUMBER = Number(args[10]);
+// param only needed for the hash
+// const BLOCK_NUMBER = Number(args[10]);
 
+// generate a hash for input parameters to cache response and not spam psp sdk
 const hash = objectHash(args);
 
 const paraSwapMin = constructSimpleSDK({ chainId: CHAIN_ID, axios });
 
+// https://github.com/aave/aave-utilities/blob/master/packages/contract-helpers/src/paraswap-liquiditySwapAdapter-contract/index.ts#L19
 function augustusFromAmountOffsetFromCalldata(calldata) {
   switch (calldata.slice(0, 10)) {
     case "0xda8567c8": // Augustus V3 multiSwap
@@ -57,6 +60,7 @@ function augustusFromAmountOffsetFromCalldata(calldata) {
   }
 }
 
+// https://github.com/aave/aave-utilities/blob/be742e5a8bfa1ed3859aaa9bc101ce807820f467/packages/contract-helpers/src/commons/utils.ts#L149
 const augustusToAmountOffsetFromCalldata = (calldata) => {
   switch (calldata.slice(0, 10)) {
     case "0x935fb84b": // Augustus V5 buyOnUniswap
@@ -74,12 +78,14 @@ const augustusToAmountOffsetFromCalldata = (calldata) => {
 };
 
 async function main(from, to, method, amount, user) {
+  // check cache and return cache if available
   const filePath = path.join(process.cwd(), "tests/pspcache", hash);
   if (fs.existsSync(filePath)) {
     const file = fs.readFileSync(filePath);
     process.stdout.write(file);
     return;
   }
+  // distinguish between exactOut and exactIn
   const excludedMethod =
     method === "SELL" ? ContractMethod.simpleSwap : ContractMethod.simpleBuy;
   const priceRoute = await paraSwapMin.swap.getRate({
@@ -98,6 +104,7 @@ async function main(from, to, method, amount, user) {
       : {}),
   });
 
+  // add slippage on non exact side of the swap
   const srcAmount =
     METHOD === SwapSide.SELL
       ? priceRoute.srcAmount

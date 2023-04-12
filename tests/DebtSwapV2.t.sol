@@ -89,8 +89,6 @@ contract DebtSwapV2Test is BaseTest {
     _supply(AaveV2Ethereum.POOL, supplyAmount, debtAsset);
     _borrow(AaveV2Ethereum.POOL, borrowAmount, debtAsset);
 
-    skip(1000);
-
     // add some margin to account for accumulated debt
     uint256 repayAmount = (borrowAmount * 101) / 100;
     PsPResponse memory psp = _fetchPSPRoute(
@@ -101,6 +99,8 @@ contract DebtSwapV2Test is BaseTest {
       false,
       false
     );
+
+    skip(10 days);
 
     ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
 
@@ -121,6 +121,52 @@ contract DebtSwapV2Test is BaseTest {
 
     uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(user);
     uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(user);
+    assertEq(vDEBT_TOKENBalanceAfter, 0);
+    assertLe(vNEWDEBT_TOKENBalanceAfter, psp.srcAmount);
+  }
+
+  function test_debtSwap_swapAll_BUSD() public {
+    address vBUSD_WHALE = 0x203372E2a8F2F807A10ca8231fA74e4fd303f298;
+    vm.startPrank(vBUSD_WHALE); // vBUSD Whale
+    address debtAsset = AaveV2EthereumAssets.BUSD_UNDERLYING;
+    address debtToken = AaveV2EthereumAssets.BUSD_V_TOKEN;
+    address newDebtAsset = AaveV2EthereumAssets.DAI_UNDERLYING;
+    address newDebtToken = AaveV2EthereumAssets.DAI_V_TOKEN;
+
+    uint256 borrowAmount = IERC20Detailed(debtToken).balanceOf(vBUSD_WHALE);
+
+    // add some margin to account for accumulated debt
+    uint256 repayAmount = (borrowAmount * 101) / 100;
+    PsPResponse memory psp = _fetchPSPRoute(
+      newDebtAsset,
+      debtAsset,
+      repayAmount,
+      vBUSD_WHALE,
+      false,
+      false
+    );
+
+    skip(1 days);
+
+    ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
+
+    ParaSwapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = ParaSwapDebtSwapAdapter
+      .DebtSwapParams({
+        debtAsset: debtAsset,
+        debtRepayAmount: repayAmount,
+        debtRateMode: 2,
+        newDebtAsset: newDebtAsset,
+        maxNewDebtAmount: psp.srcAmount,
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+      });
+
+    uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(vBUSD_WHALE);
+
+    ParaSwapDebtSwapAdapter.CreditDelegationInput memory cd;
+    debtSwapAdapter.swapDebt(debtSwapParams, cd);
+
+    uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(vBUSD_WHALE);
+    uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(vBUSD_WHALE);
     assertEq(vDEBT_TOKENBalanceAfter, 0);
     assertLe(vNEWDEBT_TOKENBalanceAfter, psp.srcAmount);
   }
