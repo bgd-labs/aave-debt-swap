@@ -8,16 +8,17 @@ import {AaveV2Ethereum, AaveV2EthereumAssets, ILendingPool} from 'aave-address-b
 import {BaseTest} from './utils/BaseTest.sol';
 import {ICreditDelegationToken} from '../src/interfaces/ICreditDelegationToken.sol';
 import {ParaSwapDebtSwapAdapter} from '../src/contracts/ParaSwapDebtSwapAdapter.sol';
+import {ParaSwapDebtSwapAdapterV2} from '../src/contracts/ParaSwapDebtSwapAdapterV2.sol';
 import {AugustusRegistry} from '../src/lib/AugustusRegistry.sol';
 
 contract DebtSwapV2Test is BaseTest {
-  ParaSwapDebtSwapAdapter internal debtSwapAdapter;
+  ParaSwapDebtSwapAdapterV2 internal debtSwapAdapter;
 
   function setUp() public override {
     super.setUp();
     vm.createSelectFork(vm.rpcUrl('mainnet'), 16956285);
 
-    debtSwapAdapter = new ParaSwapDebtSwapAdapter(
+    debtSwapAdapter = new ParaSwapDebtSwapAdapterV2(
       IPoolAddressesProvider(address(AaveV2Ethereum.POOL_ADDRESSES_PROVIDER)),
       address(AaveV2Ethereum.POOL),
       AugustusRegistry.ETHEREUM,
@@ -75,6 +76,7 @@ contract DebtSwapV2Test is BaseTest {
     uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(user);
     assertEq(vDEBT_TOKENBalanceAfter, vDEBT_TOKENBalanceBefore - repayAmount);
     assertLe(vNEWDEBT_TOKENBalanceAfter, psp.srcAmount);
+    _invariant(address(debtSwapAdapter), debtAsset, newDebtAsset);
   }
 
   function test_debtSwap_swapAll() public {
@@ -101,22 +103,20 @@ contract DebtSwapV2Test is BaseTest {
       true
     );
 
-    skip(10 days);
+    skip(1 hours);
 
     ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
 
     ParaSwapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = ParaSwapDebtSwapAdapter
       .DebtSwapParams({
         debtAsset: debtAsset,
-        debtRepayAmount: repayAmount,
+        debtRepayAmount: type(uint256).max,
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
         paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
         offset: psp.offset
       });
-
-    uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
 
     ParaSwapDebtSwapAdapter.CreditDelegationInput memory cd;
     debtSwapAdapter.swapDebt(debtSwapParams, cd);
@@ -125,6 +125,7 @@ contract DebtSwapV2Test is BaseTest {
     uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(user);
     assertEq(vDEBT_TOKENBalanceAfter, 0);
     assertLe(vNEWDEBT_TOKENBalanceAfter, psp.srcAmount);
+    _invariant(address(debtSwapAdapter), debtAsset, newDebtAsset);
   }
 
   function test_debtSwap_swapAll_BUSD() public {
@@ -155,7 +156,7 @@ contract DebtSwapV2Test is BaseTest {
     ParaSwapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = ParaSwapDebtSwapAdapter
       .DebtSwapParams({
         debtAsset: debtAsset,
-        debtRepayAmount: repayAmount,
+        debtRepayAmount: type(uint256).max,
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
@@ -172,6 +173,7 @@ contract DebtSwapV2Test is BaseTest {
     uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(vBUSD_WHALE);
     assertEq(vDEBT_TOKENBalanceAfter, 0);
     assertLe(vNEWDEBT_TOKENBalanceAfter, psp.srcAmount);
+    _invariant(address(debtSwapAdapter), debtAsset, newDebtAsset);
   }
 
   function _supply(ILendingPool pool, uint256 amount, address asset) internal {

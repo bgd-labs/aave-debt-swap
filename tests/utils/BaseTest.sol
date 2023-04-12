@@ -53,4 +53,16 @@ contract BaseTest is Test {
     bytes memory res = vm.ffi(inputs);
     return abi.decode(res, (PsPResponse));
   }
+
+  /**
+   * @dev Ensure balances are 0 on the adapter itself
+   */
+  function _invariant(address adapter, address debtAsset, address newDebtAsset) internal {
+    assertEq(IERC20Detailed(debtAsset).balanceOf(address(adapter)), 0, 'LEFTOVER_DEBT_ASSET');
+    assertEq(
+      IERC20Detailed(newDebtAsset).balanceOf(address(adapter)),
+      0,
+      'LEFTOVER_NEW_DEBT_ASSET'
+    );
+  }
 }
