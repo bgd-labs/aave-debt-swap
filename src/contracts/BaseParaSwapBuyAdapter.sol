@@ -5,6 +5,7 @@ import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contra
 import {PercentageMath} from '@aave/core-v3/contracts/protocol/libraries/math/PercentageMath.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
+import {SafeERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeERC20.sol';
 import {IParaSwapAugustus} from '../interfaces/IParaSwapAugustus.sol';
 import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry.sol';
 import {BaseParaSwapAdapter} from './BaseParaSwapAdapter.sol';
@@ -14,6 +15,7 @@ import {BaseParaSwapAdapter} from './BaseParaSwapAdapter.sol';
  * @notice Implements the logic for buying tokens on ParaSwap
  */
 abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
+  using SafeERC20 for IERC20Detailed;
   using PercentageMath for uint256;
   using SafeMath for uint256;
 
@@ -74,8 +76,8 @@ abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
     uint256 balanceBeforeAssetTo = assetToSwapTo.balanceOf(address(this));
 
     address tokenTransferProxy = augustus.getTokenTransferProxy();
-    assetToSwapFrom.approve(tokenTransferProxy, 0);
-    assetToSwapFrom.approve(tokenTransferProxy, maxAmountToSwap);
+    assetToSwapFrom.safeApprove(tokenTransferProxy, 0);
+    assetToSwapFrom.safeApprove(tokenTransferProxy, maxAmountToSwap);
 
     if (toAmountOffset != 0) {
       // Ensure 256 bit (32 bytes) toAmountOffset value is within bounds of the
