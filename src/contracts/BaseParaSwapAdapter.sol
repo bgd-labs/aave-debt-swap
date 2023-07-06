@@ -9,7 +9,6 @@ import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAd
 import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
 import {IPriceOracleGetter} from '@aave/core-v3/contracts/interfaces/IPriceOracleGetter.sol';
 import {SafeERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeERC20.sol';
-import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeMath.sol';
 import {Ownable} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/Ownable.sol';
 import {IFlashLoanReceiverBase} from '../interfaces/IFlashLoanReceiverBase.sol';
 
@@ -19,7 +18,6 @@ import {IFlashLoanReceiverBase} from '../interfaces/IFlashLoanReceiverBase.sol';
  * @author Jason Raymond Bell
  */
 abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
-  using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using SafeERC20 for IERC20Detailed;
   using SafeERC20 for IERC20WithPermit;

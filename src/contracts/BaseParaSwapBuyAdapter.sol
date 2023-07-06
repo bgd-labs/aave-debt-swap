@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeMath.sol';
 import {PercentageMath} from '@aave/core-v3/contracts/protocol/libraries/math/PercentageMath.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
@@ -17,7 +16,6 @@ import {BaseParaSwapAdapter} from './BaseParaSwapAdapter.sol';
 abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
   using SafeERC20 for IERC20Detailed;
   using PercentageMath for uint256;
-  using SafeMath for uint256;
 
   IParaSwapAugustusRegistry public immutable AUGUSTUS_REGISTRY;
 
@@ -63,10 +61,9 @@ abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
       uint256 fromAssetPrice = _getPrice(address(assetToSwapFrom));
       uint256 toAssetPrice = _getPrice(address(assetToSwapTo));
 
-      uint256 expectedMaxAmountToSwap = amountToReceive
-        .mul(toAssetPrice.mul(10 ** fromAssetDecimals))
-        .div(fromAssetPrice.mul(10 ** toAssetDecimals))
-        .percentMul(PercentageMath.PERCENTAGE_FACTOR.add(MAX_SLIPPAGE_PERCENT));
+      uint256 expectedMaxAmountToSwap = ((amountToReceive *
+        (toAssetPrice * 10 ** fromAssetDecimals)) / (fromAssetPrice * 10 ** toAssetDecimals))
+        .percentMul(PercentageMath.PERCENTAGE_FACTOR + MAX_SLIPPAGE_PERCENT);
 
       require(maxAmountToSwap <= expectedMaxAmountToSwap, 'maxAmountToSwap exceed max slippage');
     }
@@ -83,7 +80,7 @@ abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
       // Ensure 256 bit (32 bytes) toAmountOffset value is within bounds of the
       // calldata, not overlapping with the first 4 bytes (function selector).
       require(
-        toAmountOffset >= 4 && toAmountOffset <= buyCalldata.length.sub(32),
+        toAmountOffset >= 4 && toAmountOffset <= buyCalldata.length - 32,
         'TO_AMOUNT_OFFSET_OUT_OF_RANGE'
       );
       // Overwrite the toAmount with the correct amount for the buy.
@@ -105,7 +102,7 @@ abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
     uint256 balanceAfterAssetFrom = assetToSwapFrom.balanceOf(address(this));
     amountSold = balanceBeforeAssetFrom - balanceAfterAssetFrom;
     require(amountSold <= maxAmountToSwap, 'WRONG_BALANCE_AFTER_SWAP');
-    uint256 amountReceived = assetToSwapTo.balanceOf(address(this)).sub(balanceBeforeAssetTo);
+    uint256 amountReceived = assetToSwapTo.balanceOf(address(this)) - balanceBeforeAssetTo;
     require(amountReceived >= amountToReceive, 'INSUFFICIENT_AMOUNT_RECEIVED');
 
     emit Bought(address(assetToSwapFrom), address(assetToSwapTo), amountSold, amountReceived);
