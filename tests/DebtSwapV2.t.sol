@@ -7,6 +7,7 @@ import {AaveGovernanceV2} from 'aave-address-book/AaveGovernanceV2.sol';
 import {AaveV2Ethereum, AaveV2EthereumAssets, ILendingPool} from 'aave-address-book/AaveV2Ethereum.sol';
 import {BaseTest} from './utils/BaseTest.sol';
 import {ICreditDelegationToken} from '../src/interfaces/ICreditDelegationToken.sol';
+import {IParaswapDebtSwapAdapter} from '../src/interfaces/IParaswapDebtSwapAdapter.sol';
 import {ParaSwapDebtSwapAdapter} from '../src/contracts/ParaSwapDebtSwapAdapter.sol';
 import {ParaSwapDebtSwapAdapterV2} from '../src/contracts/ParaSwapDebtSwapAdapterV2.sol';
 import {AugustusRegistry} from '../src/lib/AugustusRegistry.sol';
@@ -56,7 +57,7 @@ contract DebtSwapV2Test is BaseTest {
 
     ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
 
-    ParaSwapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = ParaSwapDebtSwapAdapter
+    IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
       .DebtSwapParams({
         debtAsset: debtAsset,
         debtRepayAmount: repayAmount,
@@ -69,7 +70,7 @@ contract DebtSwapV2Test is BaseTest {
 
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
 
-    ParaSwapDebtSwapAdapter.CreditDelegationInput memory cd;
+    IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
     debtSwapAdapter.swapDebt(debtSwapParams, cd);
 
     uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(user);
@@ -107,7 +108,7 @@ contract DebtSwapV2Test is BaseTest {
 
     ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
 
-    ParaSwapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = ParaSwapDebtSwapAdapter
+    IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
       .DebtSwapParams({
         debtAsset: debtAsset,
         debtRepayAmount: type(uint256).max,
@@ -118,7 +119,7 @@ contract DebtSwapV2Test is BaseTest {
         offset: psp.offset
       });
 
-    ParaSwapDebtSwapAdapter.CreditDelegationInput memory cd;
+    IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
     debtSwapAdapter.swapDebt(debtSwapParams, cd);
 
     uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(user);
@@ -153,7 +154,7 @@ contract DebtSwapV2Test is BaseTest {
 
     ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
 
-    ParaSwapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = ParaSwapDebtSwapAdapter
+    IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
       .DebtSwapParams({
         debtAsset: debtAsset,
         debtRepayAmount: type(uint256).max,
@@ -166,7 +167,7 @@ contract DebtSwapV2Test is BaseTest {
 
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(vBUSD_WHALE);
 
-    ParaSwapDebtSwapAdapter.CreditDelegationInput memory cd;
+    IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
     debtSwapAdapter.swapDebt(debtSwapParams, cd);
 
     uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(vBUSD_WHALE);
