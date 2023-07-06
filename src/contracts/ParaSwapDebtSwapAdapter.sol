@@ -17,6 +17,40 @@ import {ICreditDelegationToken} from '../interfaces/ICreditDelegationToken.sol';
 import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
 import {IParaswapDebtSwapAdapter} from '../interfaces/IParaswapDebtSwapAdapter.sol';
 
+// OpenZeppelin Contracts (last updated v4.9.0) (interfaces/IERC3156FlashBorrower.sol)
+/**
+ * @dev Interface of the ERC3156 FlashBorrower, as defined in
+ * https://eips.ethereum.org/EIPS/eip-3156[ERC-3156].
+ */
+interface IERC3156FlashBorrower {
+  /**
+   * @dev Receive a flash loan.
+   * @param initiator The initiator of the loan.
+   * @param token The loan currency.
+   * @param amount The amount of tokens lent.
+   * @param fee The additional amount of tokens to repay.
+   * @param data Arbitrary data structure, intended to contain user-defined parameters.
+   * @return The keccak256 hash of "ERC3156FlashBorrower.onFlashLoan"
+   */
+  function onFlashLoan(
+    address initiator,
+    address token,
+    uint256 amount,
+    uint256 fee,
+    bytes calldata data
+  ) external returns (bytes32);
+}
+
+// https://github.com/aave/gho-core/blob/main/src/contracts/facilitators/flashMinter/GhoFlashMinter.sol does not contain `flashLoan` method
+interface FlashMinterMock {
+  function flashLoan(
+    IERC3156FlashBorrower receiver,
+    address token,
+    uint256 amount,
+    bytes calldata data
+  ) external returns (bool);
+}
+
 /**
  * @title ParaSwapDebtSwapAdapter
  * @notice ParaSwap Adapter to perform a swap of debt to another debt.
@@ -26,13 +60,16 @@ abstract contract ParaSwapDebtSwapAdapter is
   BaseParaSwapBuyAdapter,
   ReentrancyGuard,
   IFlashLoanReceiver,
-  IParaswapDebtSwapAdapter
+  IParaswapDebtSwapAdapter,
+  IERC3156FlashBorrower
 {
   using SafeERC20 for IERC20WithPermit;
   using SafeMath for uint256;
 
   // unique identifier to track usage via flashloan events
   uint16 public constant REFERRER = 5936; // uint16(uint256(keccak256(abi.encode('debt-swap-adapter'))) / type(uint16).max)
+  address public constant GHO = address(0);
+  FlashMinterMock public constant GHO_FLASH_MINTER = FlashMinterMock(address(0));
 
   constructor(
     IPoolAddressesProvider addressesProvider,
@@ -51,6 +88,41 @@ abstract contract ParaSwapDebtSwapAdapter is
   function renewAllowance(address reserve) public {
     IERC20WithPermit(reserve).safeApprove(address(POOL), 0);
     IERC20WithPermit(reserve).safeApprove(address(POOL), type(uint256).max);
+  }
+
+  function swapDebtGho(
+    DebtSwapParams memory debtSwapParams,
+    CreditDelegationInput memory creditDelegationPermit
+  ) external {
+    uint256 excessBefore = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
+    // delegate credit
+    if (creditDelegationPermit.deadline != 0) {
+      ICreditDelegationToken(creditDelegationPermit.debtToken).delegationWithSig(
+        msg.sender,
+        address(this),
+        creditDelegationPermit.value,
+        creditDelegationPermit.deadline,
+        creditDelegationPermit.v,
+        creditDelegationPermit.r,
+        creditDelegationPermit.s
+      );
+    }
+    // flash & repay
+    if (debtSwapParams.debtRepayAmount == type(uint256).max) {
+      (address vToken, address sToken) = _getReserveData(debtSwapParams.debtAsset);
+      debtSwapParams.debtRepayAmount = debtSwapParams.debtRateMode == 2
+        ? IERC20WithPermit(vToken).balanceOf(msg.sender)
+        : IERC20WithPermit(sToken).balanceOf(msg.sender);
+    }
+    FlashParams memory flashParams = FlashParams(
+      debtSwapParams.debtAsset,
+      debtSwapParams.debtRepayAmount,
+      debtSwapParams.debtRateMode,
+      debtSwapParams.paraswapData,
+      debtSwapParams.offset,
+      msg.sender
+    );
+    GHO_FLASH_MINTER.flashLoan(address(this), GHO, debtSwapParams.maxNewDebtAmount, flashParams);
   }
 
   /**
@@ -138,25 +210,41 @@ abstract contract ParaSwapDebtSwapAdapter is
     require(msg.sender == address(POOL), 'CALLER_MUST_BE_POOL');
     require(initiator == address(this), 'INITIATOR_MUST_BE_THIS');
 
-    _swapAndRepay(params, IERC20Detailed(assets[0]), amounts[0]);
+    FlashParams memory swapParams = abi.decode(params, (FlashParams));
+    _swapAndRepay(swapParams, IERC20Detailed(assets[0]), amounts[0]);
 
     return true;
   }
 
+  /// @dev ERC-3156 Flash loan callback (in this case flash mint)
+  function onFlashLoan(
+    address initiator,
+    address token,
+    uint256 amount,
+    uint256 fee,
+    bytes calldata data
+  ) external override returns (bytes32) {
+    require(initiator == address(this), 'INITIATOR_MUST_BE_THIS');
+    require(token == GHO, 'MUST_BE_GHO');
+    FlashParams memory swapParams = abi.decode(data, (FlashParams));
+    uint256 amountSold = _swapAndRepay(swapParams, IERC20Detailed(token), amount);
+    POOL.borrow(GHO, (amountSold + fee), 1, REFERRER, swapParams.user);
+
+    return keccak256('ERC3156FlashBorrower.onFlashLoan');
+  }
+
   /**
    * @dev Swaps the flashed token to the debt token & repays the debt.
-   * @param params Encoded swap parameters
+   * @param swapParams Decoded swap parameters
    * @param newDebtAsset Address of token to be swapped
    * @param newDebtAmount Amount of the reserve to be swapped(flash loan amount)
    */
   function _swapAndRepay(
-    bytes calldata params,
+    FlashParams memory swapParams,
     IERC20Detailed newDebtAsset,
     uint256 newDebtAmount
-  ) private {
-    FlashParams memory swapParams = abi.decode(params, (FlashParams));
-
-    _buyOnParaSwap(
+  ) private returns (uint256) {
+    uint256 amountSold = _buyOnParaSwap(
       swapParams.offset,
       swapParams.paraswapData,
       newDebtAsset,
@@ -176,5 +264,6 @@ abstract contract ParaSwapDebtSwapAdapter is
       swapParams.debtRateMode,
       swapParams.user
     );
+    return amountSold;
   }
 }
