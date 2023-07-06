@@ -62,7 +62,7 @@ abstract contract BaseParaSwapBuyAdapter is BaseParaSwapAdapter {
       uint256 toAssetPrice = _getPrice(address(assetToSwapTo));
 
       uint256 expectedMaxAmountToSwap = ((amountToReceive *
-        (toAssetPrice * 10 ** fromAssetDecimals)) / (fromAssetPrice * 10 ** toAssetDecimals))
+        (toAssetPrice * (10 ** fromAssetDecimals))) / (fromAssetPrice * (10 ** toAssetDecimals)))
         .percentMul(PercentageMath.PERCENTAGE_FACTOR + MAX_SLIPPAGE_PERCENT);
 
       require(maxAmountToSwap <= expectedMaxAmountToSwap, 'maxAmountToSwap exceed max slippage');
