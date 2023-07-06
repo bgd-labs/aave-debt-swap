@@ -7,7 +7,6 @@ import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/
 import {IERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol';
 import {IERC20WithPermit} from 'solidity-utils/contracts/oz-common/interfaces/IERC20WithPermit.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
-import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeMath.sol';
 import {ReentrancyGuard} from 'aave-v3-periphery/contracts/dependencies/openzeppelin/ReentrancyGuard.sol';
 import {BaseParaSwapBuyAdapter} from './BaseParaSwapBuyAdapter.sol';
 import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry.sol';
@@ -15,6 +14,7 @@ import {IParaSwapAugustus} from '../interfaces/IParaSwapAugustus.sol';
 import {IFlashLoanReceiver} from '../interfaces/IFlashLoanReceiver.sol';
 import {ICreditDelegationToken} from '../interfaces/ICreditDelegationToken.sol';
 import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
+import {IParaswapDebtSwapAdapter} from '../interfaces/IParaswapDebtSwapAdapter.sol';
 
 /**
  * @title ParaSwapDebtSwapAdapter
@@ -24,10 +24,10 @@ import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
 abstract contract ParaSwapDebtSwapAdapter is
   BaseParaSwapBuyAdapter,
   ReentrancyGuard,
-  IFlashLoanReceiver
+  IFlashLoanReceiver,
+  IParaswapDebtSwapAdapter
 {
   using SafeERC20 for IERC20WithPermit;
-  using SafeMath for uint256;
 
   // unique identifier to track usage via flashloan events
   uint16 public constant REFERRER = 5936; // uint16(uint256(keccak256(abi.encode('debt-swap-adapter'))) / type(uint16).max)
@@ -39,13 +39,7 @@ abstract contract ParaSwapDebtSwapAdapter is
     address owner
   ) BaseParaSwapBuyAdapter(addressesProvider, pool, augustusRegistry) {
     transferOwnership(owner);
-    cacheReserves();
-  }
-
-  /**
-   * @dev caches all reserves
-   */
-  function cacheReserves() public {
+    // set initial approval for all reserves
     address[] memory reserves = POOL.getReservesList();
     for (uint256 i = 0; i < reserves.length; i++) {
       IERC20WithPermit(reserves[i]).safeApprove(address(POOL), type(uint256).max);
@@ -55,34 +49,6 @@ abstract contract ParaSwapDebtSwapAdapter is
   function renewAllowance(address reserve) public {
     IERC20WithPermit(reserve).safeApprove(address(POOL), 0);
     IERC20WithPermit(reserve).safeApprove(address(POOL), type(uint256).max);
-  }
-
-  struct FlashParams {
-    address debtAsset;
-    uint256 debtRepayAmount;
-    uint256 debtRateMode;
-    bytes paraswapData;
-    uint256 offset;
-    address user;
-  }
-
-  struct DebtSwapParams {
-    address debtAsset;
-    uint256 debtRepayAmount;
-    uint256 debtRateMode;
-    address newDebtAsset;
-    uint256 maxNewDebtAmount;
-    uint256 offset;
-    bytes paraswapData;
-  }
-
-  struct CreditDelegationInput {
-    ICreditDelegationToken debtToken;
-    uint256 value;
-    uint256 deadline;
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
   }
 
   /**
@@ -97,7 +63,7 @@ abstract contract ParaSwapDebtSwapAdapter is
   function swapDebt(
     DebtSwapParams memory debtSwapParams,
     CreditDelegationInput memory creditDelegationPermit
-  ) public {
+  ) external {
     uint256 excessBefore = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     // delegate credit
     if (creditDelegationPermit.deadline != 0) {
