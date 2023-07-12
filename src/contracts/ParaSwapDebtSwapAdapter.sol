@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import 'forge-std/Test.sol';
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol';
 import {IERC20WithPermit} from 'solidity-utils/contracts/oz-common/interfaces/IERC20WithPermit.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
-import {SafeMath} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeMath.sol';
 import {ReentrancyGuard} from 'aave-v3-periphery/contracts/dependencies/openzeppelin/ReentrancyGuard.sol';
 import {BaseParaSwapBuyAdapter} from './BaseParaSwapBuyAdapter.sol';
 import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry.sol';
@@ -64,7 +62,6 @@ abstract contract ParaSwapDebtSwapAdapter is
   IERC3156FlashBorrower
 {
   using SafeERC20 for IERC20WithPermit;
-  using SafeMath for uint256;
 
   // unique identifier to track usage via flashloan events
   uint16 public constant REFERRER = 5936; // uint16(uint256(keccak256(abi.encode('debt-swap-adapter'))) / type(uint16).max)
@@ -122,7 +119,12 @@ abstract contract ParaSwapDebtSwapAdapter is
       debtSwapParams.offset,
       msg.sender
     );
-    GHO_FLASH_MINTER.flashLoan(address(this), GHO, debtSwapParams.maxNewDebtAmount, flashParams);
+    GHO_FLASH_MINTER.flashLoan(
+      IERC3156FlashBorrower(address(this)),
+      GHO,
+      debtSwapParams.maxNewDebtAmount,
+      abi.encode(flashParams)
+    );
   }
 
   /**
