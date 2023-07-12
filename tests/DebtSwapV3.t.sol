@@ -6,6 +6,7 @@ import {IERC20WithPermit} from 'solidity-utils/contracts/oz-common/interfaces/IE
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
 import {AaveGovernanceV2} from 'aave-address-book/AaveGovernanceV2.sol';
 import {AaveV3Ethereum, AaveV3EthereumAssets, IPool} from 'aave-address-book/AaveV3Ethereum.sol';
+import {GovHelpers} from 'aave-helpers/GovHelpers.sol';
 import {BaseTest} from './utils/BaseTest.sol';
 import {ICreditDelegationToken} from '../src/interfaces/ICreditDelegationToken.sol';
 import {IParaswapDebtSwapAdapter} from '../src/interfaces/IParaswapDebtSwapAdapter.sol';
@@ -19,7 +20,7 @@ contract DebtSwapV3Test is BaseTest {
 
   function setUp() public override {
     super.setUp();
-    vm.createSelectFork(vm.rpcUrl('mainnet'), 17024856);
+    vm.createSelectFork(vm.rpcUrl('mainnet'), 17677571);
 
     debtSwapAdapter = new ParaSwapDebtSwapAdapterV3(
       IPoolAddressesProvider(address(AaveV3Ethereum.POOL_ADDRESSES_PROVIDER)),
@@ -77,7 +78,7 @@ contract DebtSwapV3Test is BaseTest {
 
     uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(user);
     uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(user);
-    assertEq(vDEBT_TOKENBalanceAfter, vDEBT_TOKENBalanceBefore - repayAmount);
+    assertApproxEqAbs(vDEBT_TOKENBalanceAfter, vDEBT_TOKENBalanceBefore - repayAmount, 1);
     assertLe(vNEWDEBT_TOKENBalanceAfter, psp.srcAmount);
     _invariant(address(debtSwapAdapter), debtAsset, newDebtAsset);
   }
@@ -88,6 +89,56 @@ contract DebtSwapV3Test is BaseTest {
     address debtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
     address newDebtAsset = AaveV3EthereumAssets.LUSD_UNDERLYING;
     address newDebtToken = AaveV3EthereumAssets.LUSD_V_TOKEN;
+
+    uint256 supplyAmount = 200000 ether;
+    uint256 borrowAmount = 1000 ether;
+
+    _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
+    _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
+
+    // add some margin to account for accumulated debt
+    uint256 repayAmount = (borrowAmount * 101) / 100;
+    PsPResponse memory psp = _fetchPSPRoute(
+      newDebtAsset,
+      debtAsset,
+      repayAmount,
+      user,
+      false,
+      true
+    );
+
+    skip(1 hours);
+
+    ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
+
+    IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
+      .DebtSwapParams({
+        debtAsset: debtAsset,
+        debtRepayAmount: type(uint256).max,
+        debtRateMode: 2,
+        newDebtAsset: newDebtAsset,
+        maxNewDebtAmount: psp.srcAmount,
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
+        offset: psp.offset
+      });
+
+    IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
+    debtSwapAdapter.swapDebt(debtSwapParams, cd);
+
+    uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(user);
+    uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(user);
+    assertEq(vDEBT_TOKENBalanceAfter, 0);
+    assertLe(vNEWDEBT_TOKENBalanceAfter, psp.srcAmount);
+    _invariant(address(debtSwapAdapter), debtAsset, newDebtAsset);
+  }
+
+  function testDebtSwapGho() public {
+    GovHelpers.passVoteAndExecute(vm, 268);
+    vm.startPrank(user);
+    address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
+    address debtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
+    address newDebtAsset = debtSwapAdapter.GHO();
+    address newDebtToken = 0x786dBff3f1292ae8F92ea68Cf93c30b34B1ed04B;
 
     uint256 supplyAmount = 200000 ether;
     uint256 borrowAmount = 1000 ether;

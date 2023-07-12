@@ -65,8 +65,11 @@ abstract contract ParaSwapDebtSwapAdapter is
 
   // unique identifier to track usage via flashloan events
   uint16 public constant REFERRER = 5936; // uint16(uint256(keccak256(abi.encode('debt-swap-adapter'))) / type(uint16).max)
-  address public constant GHO = address(0);
-  FlashMinterMock public constant GHO_FLASH_MINTER = FlashMinterMock(address(0));
+
+  // GHO special case
+  address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
+  FlashMinterMock public constant GHO_FLASH_MINTER =
+    FlashMinterMock(0xb639D208Bcf0589D54FaC24E655C79EC529762B8);
 
   constructor(
     IPoolAddressesProvider addressesProvider,
@@ -85,46 +88,6 @@ abstract contract ParaSwapDebtSwapAdapter is
   function renewAllowance(address reserve) public {
     IERC20WithPermit(reserve).safeApprove(address(POOL), 0);
     IERC20WithPermit(reserve).safeApprove(address(POOL), type(uint256).max);
-  }
-
-  function swapDebtGho(
-    DebtSwapParams memory debtSwapParams,
-    CreditDelegationInput memory creditDelegationPermit
-  ) external {
-    uint256 excessBefore = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
-    // delegate credit
-    if (creditDelegationPermit.deadline != 0) {
-      ICreditDelegationToken(creditDelegationPermit.debtToken).delegationWithSig(
-        msg.sender,
-        address(this),
-        creditDelegationPermit.value,
-        creditDelegationPermit.deadline,
-        creditDelegationPermit.v,
-        creditDelegationPermit.r,
-        creditDelegationPermit.s
-      );
-    }
-    // flash & repay
-    if (debtSwapParams.debtRepayAmount == type(uint256).max) {
-      (address vToken, address sToken) = _getReserveData(debtSwapParams.debtAsset);
-      debtSwapParams.debtRepayAmount = debtSwapParams.debtRateMode == 2
-        ? IERC20WithPermit(vToken).balanceOf(msg.sender)
-        : IERC20WithPermit(sToken).balanceOf(msg.sender);
-    }
-    FlashParams memory flashParams = FlashParams(
-      debtSwapParams.debtAsset,
-      debtSwapParams.debtRepayAmount,
-      debtSwapParams.debtRateMode,
-      debtSwapParams.paraswapData,
-      debtSwapParams.offset,
-      msg.sender
-    );
-    GHO_FLASH_MINTER.flashLoan(
-      IERC3156FlashBorrower(address(this)),
-      GHO,
-      debtSwapParams.maxNewDebtAmount,
-      abi.encode(flashParams)
-    );
   }
 
   /**
@@ -168,14 +131,31 @@ abstract contract ParaSwapDebtSwapAdapter is
       debtSwapParams.offset,
       msg.sender
     );
-    bytes memory params = abi.encode(flashParams);
-    address[] memory assets = new address[](1);
-    assets[0] = debtSwapParams.newDebtAsset;
-    uint256[] memory amounts = new uint256[](1);
-    amounts[0] = debtSwapParams.maxNewDebtAmount;
-    uint256[] memory interestRateModes = new uint256[](1);
-    interestRateModes[0] = 2;
-    POOL.flashLoan(address(this), assets, amounts, interestRateModes, msg.sender, params, REFERRER);
+    if (debtSwapParams.newDebtAsset == GHO) {
+      GHO_FLASH_MINTER.flashLoan(
+        IERC3156FlashBorrower(address(this)),
+        GHO,
+        debtSwapParams.maxNewDebtAmount,
+        abi.encode(flashParams)
+      );
+    } else {
+      bytes memory params = abi.encode(flashParams);
+      address[] memory assets = new address[](1);
+      assets[0] = debtSwapParams.newDebtAsset;
+      uint256[] memory amounts = new uint256[](1);
+      amounts[0] = debtSwapParams.maxNewDebtAmount;
+      uint256[] memory interestRateModes = new uint256[](1);
+      interestRateModes[0] = 2;
+      POOL.flashLoan(
+        address(this),
+        assets,
+        amounts,
+        interestRateModes,
+        msg.sender,
+        params,
+        REFERRER
+      );
+    }
 
     // use excess to repay parts of flash debt
     uint256 excessAfter = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
