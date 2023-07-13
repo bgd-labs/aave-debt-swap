@@ -4,44 +4,12 @@ pragma solidity ^0.8.10;
 import 'forge-std/Test.sol';
 import {ParaSwapDebtSwapAdapterV3} from './ParaSwapDebtSwapAdapterV3.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
-import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
-
-// OpenZeppelin Contracts (last updated v4.9.0) (interfaces/IERC3156FlashBorrower.sol)
-/**
- * @dev Interface of the ERC3156 FlashBorrower, as defined in
- * https://eips.ethereum.org/EIPS/eip-3156[ERC-3156].
- */
-interface IERC3156FlashBorrower {
-  /**
-   * @dev Receive a flash loan.
-   * @param initiator The initiator of the loan.
-   * @param token The loan currency.
-   * @param amount The amount of tokens lent.
-   * @param fee The additional amount of tokens to repay.
-   * @param data Arbitrary data structure, intended to contain user-defined parameters.
-   * @return The keccak256 hash of "ERC3156FlashBorrower.onFlashLoan"
-   */
-  function onFlashLoan(
-    address initiator,
-    address token,
-    uint256 amount,
-    uint256 fee,
-    bytes calldata data
-  ) external returns (bytes32);
-}
-
-// https://github.com/aave/gho-core/blob/main/src/contracts/facilitators/flashMinter/GhoFlashMinter.sol does not contain `flashLoan` method
-interface FlashMinter {
-  function flashLoan(
-    IERC3156FlashBorrower receiver,
-    address token,
-    uint256 amount,
-    bytes calldata data
-  ) external returns (bool);
-}
+import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry.sol';
+import {IERC3156FlashBorrower} from '../interfaces/IERC3156FlashBorrower.sol';
+import {IERC3156FlashLender} from '../interfaces/IERC3156FlashLender.sol';
 
 /**
  * @title ParaSwapDebtSwapAdapter
@@ -51,8 +19,8 @@ interface FlashMinter {
 contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156FlashBorrower {
   // GHO special case
   address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
-  FlashMinter public constant GHO_FLASH_MINTER =
-    FlashMinter(0xb639D208Bcf0589D54FaC24E655C79EC529762B8);
+  IERC3156FlashLender public constant GHO_FLASH_MINTER =
+    IERC3156FlashLender(0xb639D208Bcf0589D54FaC24E655C79EC529762B8);
 
   constructor(
     IPoolAddressesProvider addressesProvider,
