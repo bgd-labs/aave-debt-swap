@@ -6,7 +6,6 @@ import {IERC20WithPermit} from 'solidity-utils/contracts/oz-common/interfaces/IE
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
 import {AaveGovernanceV2} from 'aave-address-book/AaveGovernanceV2.sol';
 import {AaveV3Ethereum, AaveV3EthereumAssets, IPool} from 'aave-address-book/AaveV3Ethereum.sol';
-import {GovHelpers} from 'aave-helpers/GovHelpers.sol';
 import {BaseTest} from './utils/BaseTest.sol';
 import {ICreditDelegationToken} from '../src/interfaces/ICreditDelegationToken.sol';
 import {IParaswapDebtSwapAdapter} from '../src/interfaces/IParaswapDebtSwapAdapter.sol';
@@ -15,12 +14,12 @@ import {ParaSwapDebtSwapAdapterV3GHO} from '../src/contracts/ParaSwapDebtSwapAda
 import {AugustusRegistry} from '../src/lib/AugustusRegistry.sol';
 import {SigUtils} from './utils/SigUtils.sol';
 
-contract DebtSwapV3Test is BaseTest {
+contract DebtSwapV3GHOTest is BaseTest {
   ParaSwapDebtSwapAdapterV3GHO internal debtSwapAdapter;
 
   function setUp() public override {
     super.setUp();
-    vm.createSelectFork(vm.rpcUrl('mainnet'), 17677571);
+    vm.createSelectFork(vm.rpcUrl('mainnet'), 17699457);
 
     debtSwapAdapter = new ParaSwapDebtSwapAdapterV3GHO(
       IPoolAddressesProvider(address(AaveV3Ethereum.POOL_ADDRESSES_PROVIDER)),
@@ -32,19 +31,18 @@ contract DebtSwapV3Test is BaseTest {
 
   /**
    * 1. supply 200000 DAI
-   * 2. borrow 100 DAI
+   * 2. borrow 1000 GHO
    * 3. swap whole DAI debt to LUSD debt
    */
   function test_debtSwap_swapHalf() public {
-    GovHelpers.passVoteAndExecute(vm, 268);
     vm.startPrank(user);
     address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
     address debtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
-    address newDebtAsset = AaveV3EthereumAssets.LUSD_UNDERLYING;
-    address newDebtToken = AaveV3EthereumAssets.LUSD_V_TOKEN;
+    address newDebtAsset = debtSwapAdapter.GHO();
+    address newDebtToken = 0x786dBff3f1292ae8F92ea68Cf93c30b34B1ed04B;
 
     uint256 supplyAmount = 200000 ether;
-    uint256 borrowAmount = 1000 ether;
+    uint256 borrowAmount = 2000 ether;
 
     _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
     _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
@@ -85,7 +83,6 @@ contract DebtSwapV3Test is BaseTest {
   }
 
   function testDebtSwapGho() public {
-    GovHelpers.passVoteAndExecute(vm, 268);
     vm.startPrank(user);
     address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
     address debtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
@@ -93,7 +90,7 @@ contract DebtSwapV3Test is BaseTest {
     address newDebtToken = 0x786dBff3f1292ae8F92ea68Cf93c30b34B1ed04B;
 
     uint256 supplyAmount = 200000 ether;
-    uint256 borrowAmount = 1000 ether;
+    uint256 borrowAmount = 2000 ether;
 
     _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
     _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);

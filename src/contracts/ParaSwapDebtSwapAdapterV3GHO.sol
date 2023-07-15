@@ -7,6 +7,7 @@ import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAd
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
+import {IERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol';
 import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry.sol';
 import {IERC3156FlashBorrower} from '../interfaces/IERC3156FlashBorrower.sol';
 import {IERC3156FlashLender} from '../interfaces/IERC3156FlashLender.sol';
@@ -16,7 +17,7 @@ import {IERC3156FlashLender} from '../interfaces/IERC3156FlashLender.sol';
  * @notice ParaSwap Adapter to perform a swap of debt to another debt.
  * @author BGD labs
  **/
-contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156FlashBorrower {
+contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156FlashBorrower, Test {
   // GHO special case
   address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
   IERC3156FlashLender public constant GHO_FLASH_MINTER =
@@ -27,7 +28,9 @@ contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156Flas
     address pool,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
-  ) ParaSwapDebtSwapAdapterV3(addressesProvider, pool, augustusRegistry, owner) {}
+  ) ParaSwapDebtSwapAdapterV3(addressesProvider, pool, augustusRegistry, owner) {
+    IERC20(GHO).approve(address(GHO_FLASH_MINTER), type(uint256).max);
+  }
 
   /// @dev ERC-3156 Flash loan callback (in this case flash mint)
   function onFlashLoan(
@@ -42,7 +45,8 @@ contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156Flas
     require(token == GHO, 'MUST_BE_GHO');
     FlashParams memory swapParams = abi.decode(data, (FlashParams));
     uint256 amountSold = _swapAndRepay(swapParams, IERC20Detailed(token), amount);
-    POOL.borrow(GHO, (amountSold + fee), 1, REFERRER, swapParams.user);
+
+    POOL.borrow(GHO, (amountSold + fee), 2, REFERRER, swapParams.user);
 
     return keccak256('ERC3156FlashBorrower.onFlashLoan');
   }
