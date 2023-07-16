@@ -17,7 +17,7 @@ contract DebtSwapV2Test is BaseTest {
 
   function setUp() public override {
     super.setUp();
-    vm.createSelectFork(vm.rpcUrl('mainnet'), 16956285);
+    vm.createSelectFork(vm.rpcUrl('mainnet'), 17706839);
 
     debtSwapAdapter = new ParaSwapDebtSwapAdapterV2(
       IPoolAddressesProvider(address(AaveV2Ethereum.POOL_ADDRESSES_PROVIDER)),
@@ -29,7 +29,7 @@ contract DebtSwapV2Test is BaseTest {
 
   /**
    * 1. supply 200000 DAI
-   * 2. borrow 100 DAI
+   * 2. borrow 1000 DAI
    * 3. swap whole DAI debt to LUSD debt
    */
   function test_debtSwap_swapHalf() public {
@@ -40,7 +40,7 @@ contract DebtSwapV2Test is BaseTest {
     address newDebtToken = AaveV2EthereumAssets.LUSD_V_TOKEN;
 
     uint256 supplyAmount = 200000 ether;
-    uint256 borrowAmount = 100 ether;
+    uint256 borrowAmount = 1000 ether;
 
     _supply(AaveV2Ethereum.POOL, supplyAmount, debtAsset);
     _borrow(AaveV2Ethereum.POOL, borrowAmount, debtAsset);
@@ -88,7 +88,7 @@ contract DebtSwapV2Test is BaseTest {
     address newDebtToken = AaveV2EthereumAssets.LUSD_V_TOKEN;
 
     uint256 supplyAmount = 200000 ether;
-    uint256 borrowAmount = 100 ether;
+    uint256 borrowAmount = 1000 ether;
 
     _supply(AaveV2Ethereum.POOL, supplyAmount, debtAsset);
     _borrow(AaveV2Ethereum.POOL, borrowAmount, debtAsset);
@@ -130,7 +130,7 @@ contract DebtSwapV2Test is BaseTest {
   }
 
   function test_debtSwap_swapAll_BUSD() public {
-    address vBUSD_WHALE = 0x203372E2a8F2F807A10ca8231fA74e4fd303f298;
+    address vBUSD_WHALE = 0x154AF3A2071363D3fFcDB43744C2a906d8EB856a;
     vm.startPrank(vBUSD_WHALE); // vBUSD Whale
     address debtAsset = AaveV2EthereumAssets.BUSD_UNDERLYING;
     address debtToken = AaveV2EthereumAssets.BUSD_V_TOKEN;
@@ -150,7 +150,7 @@ contract DebtSwapV2Test is BaseTest {
       true
     );
 
-    skip(1 days);
+    skip(1 minutes);
 
     ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
 

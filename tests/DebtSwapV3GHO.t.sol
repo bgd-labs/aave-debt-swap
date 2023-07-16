@@ -19,7 +19,7 @@ contract DebtSwapV3GHOTest is BaseTest {
 
   function setUp() public override {
     super.setUp();
-    vm.createSelectFork(vm.rpcUrl('mainnet'), 17699457);
+    vm.createSelectFork(vm.rpcUrl('mainnet'), 17706797);
 
     debtSwapAdapter = new ParaSwapDebtSwapAdapterV3GHO(
       IPoolAddressesProvider(address(AaveV3Ethereum.POOL_ADDRESSES_PROVIDER)),

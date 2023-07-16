@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import 'forge-std/Test.sol';
 import {ParaSwapDebtSwapAdapterV3} from './ParaSwapDebtSwapAdapterV3.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
@@ -17,7 +16,7 @@ import {IERC3156FlashLender} from '../interfaces/IERC3156FlashLender.sol';
  * @notice ParaSwap Adapter to perform a swap of debt to another debt.
  * @author BGD labs
  **/
-contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156FlashBorrower, Test {
+contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156FlashBorrower {
   // GHO special case
   address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
   IERC3156FlashLender public constant GHO_FLASH_MINTER =
