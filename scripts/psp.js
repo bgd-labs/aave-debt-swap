@@ -55,6 +55,16 @@ function augustusFromAmountOffsetFromCalldata(calldata) {
       return 68; // 4 + 2 * 32
     case "0x46c67b6d": // Augustus V5 megaSwap
       return 68; // 4 + 2 * 32
+    case "0xb22f4db8": // directBalancerV2GivenInSwap
+      return 68; // 4 + 2 * 32
+    case "0x19fc5be0": // directBalancerV2GivenOutSwap
+      return 68; // 4 + 2 * 32
+    case "0x3865bde6": // directCurveV1Swap
+      return 68; // 4 + 2 * 32
+    case "0x58f15100": // directCurveV2Swap
+      return 68; // 4 + 2 * 32
+    case "0xa6866da9": // directUniV3Swap
+      return 68; // 4 + 2 * 32
     default:
       throw new Error("Unrecognized function selector for Augustus");
   }
@@ -72,6 +82,8 @@ const augustusToAmountOffsetFromCalldata = (calldata) => {
     case "0xb66bcbac": // Augustus V5 buy (old)
     case "0x35326910": // Augustus V5 buy
       return 164; // 4 + 5 * 32
+    case "0x87a63926": // directUniV3Buy
+      return 68; // 4 + 2 * 32
     default:
       throw new Error("Unrecognized function selector for Augustus");
   }
@@ -85,9 +97,11 @@ async function main(from, to, method, amount, user) {
     process.stdout.write(file);
     return;
   }
-  // distinguish between exactOut and exactIn
+  // distinguish between exactOut and exactInoutdMethod
   const excludedMethod =
-    method === "SELL" ? ContractMethod.simpleSwap : ContractMethod.simpleBuy;
+    method === "SELL"
+      ? [ContractMethod.simpleSwap]
+      : [ContractMethod.simpleBuy, ContractMethod.directUniV3Buy];
   const priceRoute = await paraSwapMin.swap.getRate({
     srcToken: from,
     srcDecimals: FROM_DECIMALS,
@@ -98,7 +112,7 @@ async function main(from, to, method, amount, user) {
     ...(MAX
       ? {
           options: {
-            excludeContractMethods: [excludedMethod],
+            excludeContractMethods: [...excludedMethod],
           },
         }
       : {}),

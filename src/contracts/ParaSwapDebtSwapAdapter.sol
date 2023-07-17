@@ -91,15 +91,7 @@ abstract contract ParaSwapDebtSwapAdapter is
       debtSwapParams.offset,
       msg.sender
     );
-    bytes memory params = abi.encode(flashParams);
-    address[] memory assets = new address[](1);
-    assets[0] = debtSwapParams.newDebtAsset;
-    uint256[] memory amounts = new uint256[](1);
-    amounts[0] = debtSwapParams.maxNewDebtAmount;
-    uint256[] memory interestRateModes = new uint256[](1);
-    interestRateModes[0] = 2;
-    POOL.flashLoan(address(this), assets, amounts, interestRateModes, msg.sender, params, REFERRER);
-
+    _flash(flashParams, debtSwapParams);
     // use excess to repay parts of flash debt
     uint256 excessAfter = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     uint256 excess = excessAfter - excessBefore;
@@ -113,6 +105,20 @@ abstract contract ParaSwapDebtSwapAdapter is
       }
       POOL.repay(debtSwapParams.newDebtAsset, excess, 2, msg.sender);
     }
+  }
+
+  function _flash(
+    FlashParams memory flashParams,
+    DebtSwapParams memory debtSwapParams
+  ) internal virtual {
+    bytes memory params = abi.encode(flashParams);
+    address[] memory assets = new address[](1);
+    assets[0] = debtSwapParams.newDebtAsset;
+    uint256[] memory amounts = new uint256[](1);
+    amounts[0] = debtSwapParams.maxNewDebtAmount;
+    uint256[] memory interestRateModes = new uint256[](1);
+    interestRateModes[0] = 2;
+    POOL.flashLoan(address(this), assets, amounts, interestRateModes, msg.sender, params, REFERRER);
   }
 
   /**
@@ -135,25 +141,24 @@ abstract contract ParaSwapDebtSwapAdapter is
     require(msg.sender == address(POOL), 'CALLER_MUST_BE_POOL');
     require(initiator == address(this), 'INITIATOR_MUST_BE_THIS');
 
-    _swapAndRepay(params, IERC20Detailed(assets[0]), amounts[0]);
+    FlashParams memory swapParams = abi.decode(params, (FlashParams));
+    _swapAndRepay(swapParams, IERC20Detailed(assets[0]), amounts[0]);
 
     return true;
   }
 
   /**
    * @dev Swaps the flashed token to the debt token & repays the debt.
-   * @param params Encoded swap parameters
+   * @param swapParams Decoded swap parameters
    * @param newDebtAsset Address of token to be swapped
    * @param newDebtAmount Amount of the reserve to be swapped(flash loan amount)
    */
   function _swapAndRepay(
-    bytes calldata params,
+    FlashParams memory swapParams,
     IERC20Detailed newDebtAsset,
     uint256 newDebtAmount
-  ) private {
-    FlashParams memory swapParams = abi.decode(params, (FlashParams));
-
-    _buyOnParaSwap(
+  ) internal returns (uint256) {
+    uint256 amountSold = _buyOnParaSwap(
       swapParams.offset,
       swapParams.paraswapData,
       newDebtAsset,
@@ -173,5 +178,6 @@ abstract contract ParaSwapDebtSwapAdapter is
       swapParams.debtRateMode,
       swapParams.user
     );
+    return amountSold;
   }
 }
