@@ -6,7 +6,6 @@ import {IERC20WithPermit} from 'solidity-utils/contracts/oz-common/interfaces/IE
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
 import {AaveGovernanceV2} from 'aave-address-book/AaveGovernanceV2.sol';
 import {AaveV3Ethereum, AaveV3EthereumAssets, IPool} from 'aave-address-book/AaveV3Ethereum.sol';
-import {GovHelpers} from 'aave-helpers/GovHelpers.sol';
 import {BaseTest} from './utils/BaseTest.sol';
 import {ICreditDelegationToken} from '../src/interfaces/ICreditDelegationToken.sol';
 import {IParaswapDebtSwapAdapter} from '../src/interfaces/IParaswapDebtSwapAdapter.sol';
