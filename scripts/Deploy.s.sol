@@ -13,6 +13,7 @@ import {AaveV3Avalanche} from 'aave-address-book/AaveV3Avalanche.sol';
 import {AaveV3Optimism} from 'aave-address-book/AaveV3Optimism.sol';
 import {AaveV3Arbitrum} from 'aave-address-book/AaveV3Arbitrum.sol';
 import {ParaSwapDebtSwapAdapterV3} from '../src/contracts/ParaSwapDebtSwapAdapterV3.sol';
+import {ParaSwapDebtSwapAdapterV3GHO} from '../src/contracts/ParaSwapDebtSwapAdapterV3GHO.sol';
 import {ParaSwapDebtSwapAdapterV2} from '../src/contracts/ParaSwapDebtSwapAdapterV2.sol';
 import {AugustusRegistry} from '../src/lib/AugustusRegistry.sol';
 
@@ -29,7 +30,7 @@ contract EthereumV2 is EthereumScript {
 
 contract EthereumV3 is EthereumScript {
   function run() external broadcast {
-    new ParaSwapDebtSwapAdapterV3(
+    new ParaSwapDebtSwapAdapterV3GHO(
       IPoolAddressesProvider(address(AaveV3Ethereum.POOL_ADDRESSES_PROVIDER)),
       address(AaveV3Ethereum.POOL),
       AugustusRegistry.ETHEREUM,

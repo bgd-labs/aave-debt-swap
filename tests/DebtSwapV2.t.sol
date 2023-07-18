@@ -165,8 +165,6 @@ contract DebtSwapV2Test is BaseTest {
         offset: psp.offset
       });
 
-    uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(vBUSD_WHALE);
-
     IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
     debtSwapAdapter.swapDebt(debtSwapParams, cd);
 
