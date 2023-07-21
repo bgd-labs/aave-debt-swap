@@ -5,6 +5,7 @@ import {ICreditDelegationToken} from './ICreditDelegationToken.sol';
 interface IParaswapDebtSwapAdapter {
   struct FlashParams {
     address debtAsset;
+    /// @notice should be type(uint256).max when trying to repay all
     uint256 debtRepayAmount;
     uint256 debtRateMode;
     bytes paraswapData;
