@@ -201,7 +201,8 @@ contract DebtSwapV3Test is BaseTest {
     // We want to end with LT > utilisation > LTV, so we pump up the utilisation to 75% by withdrawing (80 > 75 > 67).
     uint256 withdrawAmount = supplyAmount - (borrowAmount * 100) / 75;
 
-    deal(debtAsset, address(debtSwapAdapter), 1e18); // To cover the premium
+    // Deal some debtAsset to cover the premium and any 1 wei rounding errors on withdrawal.
+    deal(debtAsset, address(debtSwapAdapter), 1e18); 
 
     vm.startPrank(user);
 
@@ -262,7 +263,8 @@ contract DebtSwapV3Test is BaseTest {
     // We want to end with LT > utilisation > LTV, so we pump up the utilisation to 75% by withdrawing (80 > 75 > 67).
     uint256 withdrawAmount = supplyAmount - (borrowAmount * 100) / 75;
 
-    deal(debtAsset, address(debtSwapAdapter), 1e18); // To cover the premium
+    // Deal some debtAsset to cover the premium and any 1 wei rounding errors on withdrawal.
+    deal(debtAsset, address(debtSwapAdapter), 1e18);
 
     vm.startPrank(user);
 
