@@ -125,7 +125,15 @@ abstract contract ParaSwapDebtSwapAdapter is
     // This is only true if there is no need for extra collateral.
     interestRateModes[0] = flashParams.newDebtAsset == asset ? 2 : 0;
 
-    POOL.flashLoan(address(this), assets, amounts, interestRateModes, msg.sender, params, REFERRER);
+    POOL.flashLoan(
+      address(this),
+      assets,
+      amounts,
+      interestRateModes,
+      flashParams.user,
+      params,
+      REFERRER
+    );
   }
 
   /**
@@ -157,6 +165,17 @@ abstract contract ParaSwapDebtSwapAdapter is
       address collateralAsset = assets[0];
       uint256 collateralAmount = amounts[0];
 
+      address aToken = POOL.getReserveData(collateralAsset).aTokenAddress;
+      console2.log(
+        'Current aToken bal pre supp:',
+        IERC20(aToken).balanceOf(flashParams.user) / 1e18
+      );
+
+      (, , , , uint256 ltv, uint256 hf) = POOL.getUserAccountData(flashParams.user);
+      console2.log('ltv:', ltv);
+      console2.log('hf:', hf);
+      console2.log('collateralAmount:', collateralAmount / 1e18);
+
       // Supply
       console2.log(
         'before supply aDai:',
@@ -171,9 +190,14 @@ abstract contract ParaSwapDebtSwapAdapter is
       // Execute the nested flashloan
       _flash(flashParams, flashParams.newDebtAsset, flashParams.maxNewDebtAmount);
       console2.log('passed normal flash after coll');
+      (, , , , ltv, hf) = POOL.getUserAccountData(flashParams.user);
+      console2.log('ltv:', ltv);
+      console2.log('hf:', hf);
+      console2.log('collateralAmount:', collateralAmount / 1e18);
 
       // Fetch and transfer back in the aToken to allow the pool to pull it.
-      address aToken = POOL.getReserveData(collateralAsset).aTokenAddress;
+      aToken = POOL.getReserveData(collateralAsset).aTokenAddress;
+      console2.log('Current aToken bal:', IERC20(aToken).balanceOf(flashParams.user) / 1e18);
       IERC20WithPermit(aToken).safeTransferFrom(flashParams.user, address(this), collateralAmount); // Could be rounding error but it's insignificant
       POOL.withdraw(collateralAsset, collateralAmount, address(this));
       _conditionalRenewAllowance(collateralAsset, collateralAmount);

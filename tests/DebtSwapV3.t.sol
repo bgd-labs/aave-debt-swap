@@ -191,30 +191,90 @@ contract DebtSwapV3Test is BaseTest {
     _invariant(address(debtSwapAdapter), debtAsset, newDebtAsset);
   }
 
-  function test_debtSwap_Extra_Collateral() public {
-    // We'll use the debtAsset & supplyAmount as extra collateral too.
+  function test_Revert_debtSwap_Without_Extra_Collateral() public {
     address aToken = AaveV3EthereumAssets.DAI_A_TOKEN;
     address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
-    address debtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
     address newDebtAsset = AaveV3EthereumAssets.LUSD_UNDERLYING;
     address newDebtToken = AaveV3EthereumAssets.LUSD_V_TOKEN;
 
-    uint256 supplyAmount = 100e18;
-    uint256 borrowAmount = 67e18;
-    uint256 withdrawAmount = supplyAmount - (borrowAmount * 10) / 8; // We want to end with 80% utilisation
+    uint256 supplyAmount = 120e18;
+    uint256 borrowAmount = 80e18;
+
+    // We want to end with LT > utilisation > LTV, so we pump up the utilisation to 75% by withdrawing (80 > 75 > 67).
+    uint256 withdrawAmount = supplyAmount - (borrowAmount * 100) / 75;
+
+    deal(debtAsset, address(debtSwapAdapter), 1e18); // To cover the premium
 
     vm.startPrank(user);
 
     _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
     _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
 
+    _withdraw(AaveV3Ethereum.POOL, withdrawAmount, debtAsset);
+
     vm.expectRevert(bytes(Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW));
-    _borrow(AaveV3Ethereum.POOL, 1e18, debtAsset);
+    _borrow(AaveV3Ethereum.POOL, 1, debtAsset);
+
+    // Swap debt
+    // add some margin to account for accumulated debt
+    uint256 repayAmount = (borrowAmount * 101) / 100;
+    PsPResponse memory psp = _fetchPSPRoute(
+      newDebtAsset,
+      debtAsset,
+      repayAmount,
+      user,
+      false,
+      true
+    );
+
+    skip(1 hours);
+
+    ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
+    IERC20Detailed(aToken).approve(address(debtSwapAdapter), supplyAmount);
+
+    IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
+      .DebtSwapParams({
+        debtAsset: debtAsset,
+        debtRepayAmount: type(uint256).max,
+        debtRateMode: 2,
+        newDebtAsset: newDebtAsset,
+        maxNewDebtAmount: psp.srcAmount,
+        extraCollateralAsset: address(0),
+        extraCollateralAmount: 0,
+        offset: psp.offset,
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+      });
+
+    IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
+
+    vm.expectRevert(bytes(Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW));
+    debtSwapAdapter.swapDebt(debtSwapParams, cd);
+  }
+
+  function test_debtSwap_Extra_Collateral() public {
+    // We'll use the debtAsset & supplyAmount as extra collateral too.
+    address aToken = AaveV3EthereumAssets.DAI_A_TOKEN;
+    address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
+    address newDebtAsset = AaveV3EthereumAssets.LUSD_UNDERLYING;
+    address newDebtToken = AaveV3EthereumAssets.LUSD_V_TOKEN;
+
+    uint256 supplyAmount = 120e18;
+    uint256 borrowAmount = 80e18;
+
+    // We want to end with LT > utilisation > LTV, so we pump up the utilisation to 75% by withdrawing (80 > 75 > 67).
+    uint256 withdrawAmount = supplyAmount - (borrowAmount * 100) / 75;
+
+    deal(debtAsset, address(debtSwapAdapter), 1e18); // To cover the premium
+
+    vm.startPrank(user);
+
+    _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
+    _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
 
     _withdraw(AaveV3Ethereum.POOL, withdrawAmount, debtAsset);
 
-    vm.expectRevert(bytes(Errors.HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD));
-    _borrow(AaveV3Ethereum.POOL, 1e18, debtAsset);
+    vm.expectRevert(bytes(Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW));
+    _borrow(AaveV3Ethereum.POOL, 1, debtAsset);
 
     // Swap debt
     // add some margin to account for accumulated debt
@@ -248,8 +308,6 @@ contract DebtSwapV3Test is BaseTest {
 
     IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
     debtSwapAdapter.swapDebt(debtSwapParams, cd);
-
-    console2.log('here');
   }
 
   function _getCDPermit(
