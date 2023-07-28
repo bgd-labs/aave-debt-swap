@@ -15,6 +15,8 @@ import {ICreditDelegationToken} from '../interfaces/ICreditDelegationToken.sol';
 import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
 import {IParaswapDebtSwapAdapter} from '../interfaces/IParaswapDebtSwapAdapter.sol';
 
+import 'forge-std/console2.sol';
+
 /**
  * @title ParaSwapDebtSwapAdapter
  * @notice ParaSwap Adapter to perform a swap of debt to another debt.
@@ -87,37 +89,42 @@ abstract contract ParaSwapDebtSwapAdapter is
       debtSwapParams.debtAsset,
       debtSwapParams.debtRepayAmount,
       debtSwapParams.debtRateMode,
+      debtSwapParams.newDebtAsset,
+      debtSwapParams.maxNewDebtAmount,
       debtSwapParams.paraswapData,
       debtSwapParams.offset,
       msg.sender
     );
-    _flash(flashParams, debtSwapParams);
+    if (debtSwapParams.extraCollateralAsset != address(0)) {
+      _flash(
+        flashParams,
+        debtSwapParams.extraCollateralAsset,
+        debtSwapParams.extraCollateralAmount
+      );
+    } else {
+      _flash(flashParams, debtSwapParams.newDebtAsset, debtSwapParams.maxNewDebtAmount);
+    }
+
     // use excess to repay parts of flash debt
     uint256 excessAfter = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     uint256 excess = excessAfter - excessBefore;
     if (excess > 0) {
-      uint256 allowance = IERC20(debtSwapParams.newDebtAsset).allowance(
-        address(this),
-        address(POOL)
-      );
-      if (allowance < excess) {
-        renewAllowance(debtSwapParams.newDebtAsset);
-      }
+      _conditionalRenewAllowance(debtSwapParams.newDebtAsset, excess);
       POOL.repay(debtSwapParams.newDebtAsset, excess, 2, msg.sender);
     }
   }
 
-  function _flash(
-    FlashParams memory flashParams,
-    DebtSwapParams memory debtSwapParams
-  ) internal virtual {
+  function _flash(FlashParams memory flashParams, address asset, uint256 amount) internal virtual {
     bytes memory params = abi.encode(flashParams);
+
     address[] memory assets = new address[](1);
-    assets[0] = debtSwapParams.newDebtAsset;
+    assets[0] = asset;
     uint256[] memory amounts = new uint256[](1);
-    amounts[0] = debtSwapParams.maxNewDebtAmount;
+    amounts[0] = amount;
     uint256[] memory interestRateModes = new uint256[](1);
-    interestRateModes[0] = 2;
+    // This is only true if there is no need for extra collateral.
+    interestRateModes[0] = flashParams.newDebtAsset == asset ? 2 : 0;
+
     POOL.flashLoan(address(this), assets, amounts, interestRateModes, msg.sender, params, REFERRER);
   }
 
@@ -141,9 +148,46 @@ abstract contract ParaSwapDebtSwapAdapter is
     require(msg.sender == address(POOL), 'CALLER_MUST_BE_POOL');
     require(initiator == address(this), 'INITIATOR_MUST_BE_THIS');
 
-    FlashParams memory swapParams = abi.decode(params, (FlashParams));
-    _swapAndRepay(swapParams, IERC20Detailed(assets[0]), amounts[0]);
+    FlashParams memory flashParams = abi.decode(params, (FlashParams));
 
+    if (flashParams.newDebtAsset != assets[0]) {
+      console2.log('Flash coll');
+
+      // There is a need for additional collateral, wrap the swap with a supply and withdraw.
+      address collateralAsset = assets[0];
+      uint256 collateralAmount = amounts[0];
+
+      // Supply
+      console2.log(
+        'before supply aDai:',
+        IERC20WithPermit(0x018008bfb33d285247A21d44E50697654f754e63).balanceOf(flashParams.user)
+      );
+      POOL.supply(collateralAsset, collateralAmount, flashParams.user, REFERRER);
+      console2.log(
+        'after supply aDai:',
+        IERC20WithPermit(0x018008bfb33d285247A21d44E50697654f754e63).balanceOf(flashParams.user)
+      );
+
+      // Execute the nested flashloan
+      _flash(flashParams, flashParams.newDebtAsset, flashParams.maxNewDebtAmount);
+      console2.log('passed normal flash after coll');
+
+      // Fetch and transfer back in the aToken to allow the pool to pull it.
+      address aToken = POOL.getReserveData(collateralAsset).aTokenAddress;
+      IERC20WithPermit(aToken).safeTransferFrom(flashParams.user, address(this), collateralAmount); // Could be rounding error but it's insignificant
+      POOL.withdraw(collateralAsset, collateralAmount, address(this));
+      _conditionalRenewAllowance(collateralAsset, collateralAmount);
+
+      // Return out of this scope.
+      return true;
+    }
+
+    console2.log('Flash normal');
+    // There is no need for additional collateral, execute the swap.
+    _swapAndRepay(flashParams, IERC20Detailed(assets[0]), amounts[0]);
+    console2.log('Passed normal swap&repay');
+    (uint256 collateralBase, , , , , ) = POOL.getUserAccountData(flashParams.user);
+    console2.log('Collateral after all:', collateralBase);
     return true;
   }
 
@@ -167,10 +211,7 @@ abstract contract ParaSwapDebtSwapAdapter is
       swapParams.debtRepayAmount
     );
 
-    uint256 allowance = IERC20(swapParams.debtAsset).allowance(address(this), address(POOL));
-    if (allowance < swapParams.debtRepayAmount) {
-      renewAllowance(address(swapParams.debtAsset));
-    }
+    _conditionalRenewAllowance(swapParams.debtAsset, swapParams.debtRepayAmount);
 
     POOL.repay(
       address(swapParams.debtAsset),
@@ -179,5 +220,12 @@ abstract contract ParaSwapDebtSwapAdapter is
       swapParams.user
     );
     return amountSold;
+  }
+
+  function _conditionalRenewAllowance(address asset, uint256 minAmount) internal {
+    uint256 allowance = IERC20(asset).allowance(address(this), address(POOL));
+    if (allowance < minAmount) {
+      renewAllowance(asset);
+    }
   }
 }

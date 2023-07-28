@@ -11,6 +11,7 @@ import {IParaSwapAugustusRegistry} from '../interfaces/IParaSwapAugustusRegistry
 import {IERC3156FlashBorrower} from '../interfaces/IERC3156FlashBorrower.sol';
 import {IERC3156FlashLender} from '../interfaces/IERC3156FlashLender.sol';
 
+// send collateral if needed via params
 /**
  * @title ParaSwapDebtSwapAdapter
  * @notice ParaSwap Adapter to perform a swap of debt to another debt.
@@ -50,19 +51,16 @@ contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156Flas
     return keccak256('ERC3156FlashBorrower.onFlashLoan');
   }
 
-  function _flash(
-    FlashParams memory flashParams,
-    DebtSwapParams memory debtSwapParams
-  ) internal override {
-    if (debtSwapParams.newDebtAsset == GHO) {
+  function _flash(FlashParams memory flashParams, address asset, uint256 amount) internal override {
+    if (asset == GHO) {
       GHO_FLASH_MINTER.flashLoan(
         IERC3156FlashBorrower(address(this)),
         GHO,
-        debtSwapParams.maxNewDebtAmount,
+        amount,
         abi.encode(flashParams)
       );
     } else {
-      super._flash(flashParams, debtSwapParams);
+      super._flash(flashParams, asset, amount);
     }
   }
 }

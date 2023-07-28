@@ -64,8 +64,10 @@ contract DebtSwapV2Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
-        offset: psp.offset
+        extraCollateralAsset: address(0),
+        extraCollateralAmount: 0,
+        offset: psp.offset,
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });
 
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
@@ -115,8 +117,10 @@ contract DebtSwapV2Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
-        offset: psp.offset
+        extraCollateralAsset: address(0),
+        extraCollateralAmount: 0,
+        offset: psp.offset,
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });
 
     IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
@@ -161,8 +165,10 @@ contract DebtSwapV2Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        paraswapData: abi.encode(psp.swapCalldata, psp.augustus),
-        offset: psp.offset
+        extraCollateralAsset: address(0),
+        extraCollateralAmount: 0,
+        offset: psp.offset,
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });
 
     IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;

@@ -103,7 +103,7 @@ library SigUtils {
     address spender,
     address token,
     uint256 value
-  ) public returns (BaseParaSwapAdapter.PermitSignature memory) {
+  ) public view returns (BaseParaSwapAdapter.PermitSignature memory) {
     Permit memory permit = Permit({
       owner: user,
       spender: spender,
