@@ -15,8 +15,6 @@ import {ICreditDelegationToken} from '../interfaces/ICreditDelegationToken.sol';
 import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
 import {IParaswapDebtSwapAdapter} from '../interfaces/IParaswapDebtSwapAdapter.sol';
 
-import 'forge-std/console2.sol';
-
 /**
  * @title ParaSwapDebtSwapAdapter
  * @notice ParaSwap Adapter to perform a swap of debt to another debt.
@@ -95,15 +93,19 @@ abstract contract ParaSwapDebtSwapAdapter is
       debtSwapParams.offset,
       msg.sender
     );
+
+    // If we need extra collateral, execute the flashloan with the collateral instead of the debt.
+    address assetToFlash;
+    uint256 amountToFlash;
     if (debtSwapParams.extraCollateralAsset != address(0)) {
-      _flash(
-        flashParams,
-        debtSwapParams.extraCollateralAsset,
-        debtSwapParams.extraCollateralAmount
-      );
+      assetToFlash = debtSwapParams.extraCollateralAsset;
+      amountToFlash = debtSwapParams.extraCollateralAmount;
     } else {
-      _flash(flashParams, debtSwapParams.newDebtAsset, debtSwapParams.maxNewDebtAmount);
+      assetToFlash = debtSwapParams.newDebtAsset;
+      amountToFlash = debtSwapParams.maxNewDebtAmount;
     }
+
+    _flash(flashParams, assetToFlash, amountToFlash);
 
     // use excess to repay parts of flash debt
     uint256 excessAfter = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
@@ -158,46 +160,20 @@ abstract contract ParaSwapDebtSwapAdapter is
 
     FlashParams memory flashParams = abi.decode(params, (FlashParams));
 
+    // This is only true if we flashed an asset other than the debt asset, so it must be collateral.
     if (flashParams.newDebtAsset != assets[0]) {
-      console2.log('Flash coll');
-
-      // There is a need for additional collateral, wrap the swap with a supply and withdraw.
+      // Wrap the swap with a supply and withdraw.
       address collateralAsset = assets[0];
       uint256 collateralAmount = amounts[0];
 
-      address aToken = POOL.getReserveData(collateralAsset).aTokenAddress;
-      console2.log(
-        'Current aToken bal pre supp:',
-        IERC20(aToken).balanceOf(flashParams.user) / 1e18
-      );
-
-      (, , , , uint256 ltv, uint256 hf) = POOL.getUserAccountData(flashParams.user);
-      console2.log('ltv:', ltv);
-      console2.log('hf:', hf);
-      console2.log('collateralAmount:', collateralAmount / 1e18);
-
       // Supply
-      console2.log(
-        'before supply aDai:',
-        IERC20WithPermit(0x018008bfb33d285247A21d44E50697654f754e63).balanceOf(flashParams.user)
-      );
       POOL.supply(collateralAsset, collateralAmount, flashParams.user, REFERRER);
-      console2.log(
-        'after supply aDai:',
-        IERC20WithPermit(0x018008bfb33d285247A21d44E50697654f754e63).balanceOf(flashParams.user)
-      );
 
       // Execute the nested flashloan
       _flash(flashParams, flashParams.newDebtAsset, flashParams.maxNewDebtAmount);
-      console2.log('passed normal flash after coll');
-      (, , , , ltv, hf) = POOL.getUserAccountData(flashParams.user);
-      console2.log('ltv:', ltv);
-      console2.log('hf:', hf);
-      console2.log('collateralAmount:', collateralAmount / 1e18);
 
       // Fetch and transfer back in the aToken to allow the pool to pull it.
-      aToken = POOL.getReserveData(collateralAsset).aTokenAddress;
-      console2.log('Current aToken bal:', IERC20(aToken).balanceOf(flashParams.user) / 1e18);
+      address aToken = POOL.getReserveData(collateralAsset).aTokenAddress;
       IERC20WithPermit(aToken).safeTransferFrom(flashParams.user, address(this), collateralAmount); // Could be rounding error but it's insignificant
       POOL.withdraw(collateralAsset, collateralAmount, address(this));
       _conditionalRenewAllowance(collateralAsset, collateralAmount);
@@ -206,12 +182,8 @@ abstract contract ParaSwapDebtSwapAdapter is
       return true;
     }
 
-    console2.log('Flash normal');
     // There is no need for additional collateral, execute the swap.
     _swapAndRepay(flashParams, IERC20Detailed(assets[0]), amounts[0]);
-    console2.log('Passed normal swap&repay');
-    (uint256 collateralBase, , , , , ) = POOL.getUserAccountData(flashParams.user);
-    console2.log('Collateral after all:', collateralBase);
     return true;
   }
 

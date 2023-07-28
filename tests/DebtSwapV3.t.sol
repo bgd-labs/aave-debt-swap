@@ -15,8 +15,6 @@ import {ParaSwapDebtSwapAdapterV3} from '../src/contracts/ParaSwapDebtSwapAdapte
 import {AugustusRegistry} from '../src/lib/AugustusRegistry.sol';
 import {SigUtils} from './utils/SigUtils.sol';
 
-import 'forge-std/console2.sol';
-
 contract DebtSwapV3Test is BaseTest {
   ParaSwapDebtSwapAdapterV3 internal debtSwapAdapter;
 
@@ -239,8 +237,8 @@ contract DebtSwapV3Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        extraCollateralAsset: address(0),
-        extraCollateralAmount: 0,
+        extraCollateralAsset: address(0), // Passing nothing as extraCollateral
+        extraCollateralAmount: 0, // Passing nothing as extraCollateralAmount
         offset: psp.offset,
         paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });
@@ -300,8 +298,8 @@ contract DebtSwapV3Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        extraCollateralAsset: debtAsset,
-        extraCollateralAmount: supplyAmount,
+        extraCollateralAsset: debtAsset, // Passing the debtAsset as extraCollateral
+        extraCollateralAmount: supplyAmount, // Passing the supplyAmount as extraCollateral
         offset: psp.offset,
         paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });
