@@ -226,6 +226,82 @@ contract DebtSwapV3Test is BaseTest {
     _invariant(address(debtSwapAdapter), debtAsset, newDebtAsset);
   }
 
+  function test_debtSwap_swapAll_lacking_allowance() public {
+    vm.startPrank(user);
+    address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
+    address debtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
+    address newDebtAsset = AaveV3EthereumAssets.LUSD_UNDERLYING;
+    address newDebtToken = AaveV3EthereumAssets.LUSD_V_TOKEN;
+
+    uint256 supplyAmount = 200000 ether;
+    uint256 borrowAmount = 1000 ether;
+
+    {
+      // Pre
+      assertEq(
+        IERC20WithPermit(debtAsset).allowance(
+          address(debtSwapAdapter),
+          address(AaveV3Ethereum.POOL)
+        ),
+        type(uint256).max
+      );
+
+      vm.record();
+      IERC20WithPermit(debtAsset).allowance(address(debtSwapAdapter), address(AaveV3Ethereum.POOL));
+      (bytes32[] memory reads, ) = vm.accesses(AaveV3EthereumAssets.DAI_UNDERLYING);
+      vm.store(address(debtAsset), reads[0], 0);
+
+      // Post
+      assertEq(
+        IERC20WithPermit(debtAsset).allowance(
+          address(debtSwapAdapter),
+          address(AaveV3Ethereum.POOL)
+        ),
+        0
+      );
+    }
+
+    _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
+    _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
+
+    // add some margin to account for accumulated debt
+    uint256 repayAmount = (borrowAmount * 101) / 100;
+    PsPResponse memory psp = _fetchPSPRoute(
+      newDebtAsset,
+      debtAsset,
+      repayAmount,
+      user,
+      false,
+      true
+    );
+
+    skip(1 hours);
+
+    ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
+
+    IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
+      .DebtSwapParams({
+        debtAsset: debtAsset,
+        debtRepayAmount: type(uint256).max,
+        debtRateMode: 2,
+        newDebtAsset: newDebtAsset,
+        maxNewDebtAmount: psp.srcAmount,
+        extraCollateralAsset: address(0),
+        extraCollateralAmount: 0,
+        offset: psp.offset,
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+      });
+
+    IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
+    debtSwapAdapter.swapDebt(debtSwapParams, cd);
+
+    uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(user);
+    uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(user);
+    assertEq(vDEBT_TOKENBalanceAfter, 0);
+    assertLe(vNEWDEBT_TOKENBalanceAfter, psp.srcAmount);
+    _invariant(address(debtSwapAdapter), debtAsset, newDebtAsset);
+  }
+
   function test_debtSwap_swapAll_permit() public {
     vm.startPrank(user);
     address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
