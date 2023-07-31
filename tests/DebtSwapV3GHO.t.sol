@@ -91,6 +91,25 @@ contract DebtSwapV3GHOTest is BaseTest {
     debtSwapAdapter.swapDebt(debtSwapParams, cd);
   }
 
+  function test_revert_Gho_onFlashloan_not_minter() public {
+    vm.expectRevert(bytes('SENDER_MUST_BE_MINTER'));
+    debtSwapAdapter.onFlashLoan(address(0), address(0), 0, 0, '');
+  }
+
+  function test_revert_Gho_onFlashloan_not_initiator() public {
+    vm.prank(0xb639D208Bcf0589D54FaC24E655C79EC529762B8);
+
+    vm.expectRevert(bytes('INITIATOR_MUST_BE_THIS'));
+    debtSwapAdapter.onFlashLoan(address(0), address(0), 0, 0, '');
+  }
+
+  function test_revert_Gho_onFlashloan_token_not_Gho() public {
+    vm.prank(0xb639D208Bcf0589D54FaC24E655C79EC529762B8);
+
+    vm.expectRevert(bytes('MUST_BE_GHO'));
+    debtSwapAdapter.onFlashLoan(address(debtSwapAdapter), address(0), 0, 0, '');
+  }
+
   /**
    * 1. supply 200000 DAI
    * 2. borrow 1000 GHO
