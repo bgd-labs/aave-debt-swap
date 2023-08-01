@@ -1,19 +1,31 @@
 # BGD labs <> Aave Debt Swap Adapter
 
 This repository contains the [ParaSwapDebtSwapAdapter](./src/contracts/ParaSwapDebtSwapAdapter.sol), which aims to allow users to arbitrage borrow APY and exit illiquid debt positions.
-Therefore this contract is able to swap one debt position to another debt position - either partially or complete.
+Therefore this contract is able to swap one debt position to another debt position - either partially or completely.
 
 You could for example swap your `1000 BUSD` debt to `max(1010 USDC)` debt.
 In order to perform this task, `swapDebt`:
 
 1. Creates a flashLoan with variable debt mode with the **target debt**(`1010 USDC`) on behalf of the user
    - On aave v2 you need to approve the debtSwapAdapter for credit delegation
-   - On aave v3 you can also pass a permit
+   - On aave v3 you can also pass a credit delegation permit
 2. It then swaps the flashed assets to the underlying of the **current debt**(`1000 BUSD`) via exact out swap (meaning it will receive `1000 BUSD`, but might only need `1000.1 USDC` for the swap)
 3. Repays the **current debt** (`1000 BUSD`)
 4. Uses potential (`9.9 USDC`) to repay parts of the newly created **target debt**
 
 The user has now payed off his `1000 BUSD` debt position, and created a new `1000.1 USDC` debt position.
+
+In situations where a user's real loan-to-value (LTV) is higher than their maximum LTV but lower than their liquidation threshold (LT), extra collateral is needed to "wrap" around the flashloan-and-swap outlined above. The flow would then look like this:
+
+1. Create a standard, repayable flashloan with the specified extra collateral asset and amount
+2. Supply the flashed collateral on behalf of the user
+3. Create the variable debt flashloan with the **target debt**(`1010 USDC`) on behalf of the user
+4. Swap the flashloaned target debt asset to the underlying of the **current debt**(`1000 BUSD`), needing only `1000.1 USDC`
+5. Repay the **current debt** (`1000 BUSD`)
+6. Repay the flashloaned collateral asset
+7. Use the remaining new debt asset (`9.9 USDC`) to repay parts of the newly created **target debt**
+
+Notice how steps 3, 4, 5, and 7 are the same four steps from the collateral-less flow.
 
 The `function swapDebt( DebtSwapParams memory debtSwapParams, CreditDelegationInput memory creditDelegationPermit )` expects two parameters.
 
@@ -26,6 +38,8 @@ struct DebtSwapParams {
   uint256 debtRateMode; // the type of debt (1 for stable, 2 for variable)
   address newDebtAsset; // the asset you want to swap to
   uint256 maxNewDebtAmount; // the max amount of debt your're willing to receive in excahnge for repaying debtRepayAmount
+  address extraCollateralAsset; // The asset to flash and add as collateral if needed
+  uint256 extraCollateralAmount; // The amount of `extraCollateralAsset` to flash and supply momentarily
   bytes paraswapData; // encoded exactOut swap
 }
 
