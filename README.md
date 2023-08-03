@@ -22,7 +22,7 @@ In situations where a user's real loan-to-value (LTV) is higher than their maxim
 3. Create the variable debt flashloan with the **target debt**(`1010 USDC`) on behalf of the user
 4. Swap the flashloaned target debt asset to the underlying of the **current debt**(`1000 BUSD`), needing only `1000.1 USDC`
 5. Repay the **current debt** (`1000 BUSD`)
-6. Repay the flashloaned collateral asset
+6. Repay the flashloaned collateral asset (requires `aToken` approval)
 7. Use the remaining new debt asset (`9.9 USDC`) to repay parts of the newly created **target debt**
 
 Notice how steps 3, 4, 5, and 7 are the same four steps from the collateral-less flow.

@@ -87,8 +87,8 @@ abstract contract ParaSwapDebtSwapAdapter is
       debtSwapParams.debtAsset,
       debtSwapParams.debtRepayAmount,
       debtSwapParams.debtRateMode,
-      debtSwapParams.newDebtAsset,
-      debtSwapParams.maxNewDebtAmount,
+      address(0), // debtSwapParams.newDebtAsset,
+      0, //debtSwapParams.maxNewDebtAmount,
       debtSwapParams.paraswapData,
       debtSwapParams.offset,
       msg.sender
@@ -100,6 +100,8 @@ abstract contract ParaSwapDebtSwapAdapter is
     if (debtSwapParams.extraCollateralAsset != address(0)) {
       assetToFlash = debtSwapParams.extraCollateralAsset;
       amountToFlash = debtSwapParams.extraCollateralAmount;
+      flashParams.nestedFlashloanDebtAsset = debtSwapParams.newDebtAsset;
+      flashParams.nestedFlashloanDebtAmount = debtSwapParams.maxNewDebtAmount;
     } else {
       assetToFlash = debtSwapParams.newDebtAsset;
       amountToFlash = debtSwapParams.maxNewDebtAmount;
@@ -125,7 +127,7 @@ abstract contract ParaSwapDebtSwapAdapter is
     amounts[0] = amount;
     uint256[] memory interestRateModes = new uint256[](1);
     // This is only true if there is no need for extra collateral.
-    interestRateModes[0] = flashParams.newDebtAsset == asset ? 2 : 0;
+    interestRateModes[0] = flashParams.nestedFlashloanDebtAsset == address(0) ? 2 : 0;
 
     POOL.flashLoan(
       address(this),
@@ -160,8 +162,8 @@ abstract contract ParaSwapDebtSwapAdapter is
 
     FlashParams memory flashParams = abi.decode(params, (FlashParams));
 
-    // This is only true if we flashed an asset other than the debt asset, so it must be collateral.
-    if (flashParams.newDebtAsset != assets[0]) {
+    // This is only non-zero if we flashed extra collateral.
+    if (flashParams.nestedFlashloanDebtAsset != address(0)) {
       // Wrap the swap with a supply and withdraw.
       address collateralAsset = assets[0];
       uint256 collateralAmount = amounts[0];
@@ -170,7 +172,9 @@ abstract contract ParaSwapDebtSwapAdapter is
       POOL.supply(collateralAsset, collateralAmount, flashParams.user, REFERRER);
 
       // Execute the nested flashloan
-      _flash(flashParams, flashParams.newDebtAsset, flashParams.maxNewDebtAmount);
+      address newAsset = flashParams.nestedFlashloanDebtAsset;
+      flashParams.nestedFlashloanDebtAsset = address(0);
+      _flash(flashParams, newAsset, flashParams.nestedFlashloanDebtAmount);
 
       // Fetch and transfer back in the aToken to allow the pool to pull it.
       address aToken = POOL.getReserveData(collateralAsset).aTokenAddress;

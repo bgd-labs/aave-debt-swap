@@ -7,8 +7,8 @@ interface IParaswapDebtSwapAdapter {
     address debtAsset;
     uint256 debtRepayAmount;
     uint256 debtRateMode;
-    address newDebtAsset;
-    uint256 maxNewDebtAmount;
+    address nestedFlashloanDebtAsset;
+    uint256 nestedFlashloanDebtAmount;
     bytes paraswapData;
     uint256 offset;
     address user;
@@ -20,7 +20,7 @@ interface IParaswapDebtSwapAdapter {
     uint256 debtRateMode;
     address newDebtAsset;
     uint256 maxNewDebtAmount;
-    address extraCollateralAsset; // Requires approval of the relevant aToken to withdraw later!
+    address extraCollateralAsset;
     uint256 extraCollateralAmount;
     uint256 offset;
     bytes paraswapData;
