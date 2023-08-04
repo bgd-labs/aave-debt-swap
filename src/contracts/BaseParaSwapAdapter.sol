@@ -80,8 +80,18 @@ abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
    * @dev Get the vToken, sToken associated to the asset
    * @return address of the vToken
    * @return address of the sToken
+   * @return address of the aToken
    */
-  function _getReserveData(address asset) internal view virtual returns (address, address);
+  function _getReserveData(address asset) internal view virtual returns (address, address, address);
+
+  /**
+   * @dev Supply "amount" of "asset" to Aave
+   * @param asset Address of the asset to be supplied
+   * @param amount Amount of the asset to be supplied
+   * @param to Address receiving the aTokens
+   * @param referralCode Referral code to pass to Aave
+   */
+  function _supply(address asset, uint256 amount, address to, uint16 referralCode) internal virtual;
 
   /**
    * @dev Emergency rescue for token stucked on this contract, as failsafe mechanism

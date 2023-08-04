@@ -34,7 +34,7 @@ contract DebtSwapV3GHOTest is BaseTest {
     address aToken = AaveV3EthereumAssets.DAI_A_TOKEN;
     address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
     address newDebtAsset = debtSwapAdapter.GHO();
-    address newDebtToken = 0x786dBff3f1292ae8F92ea68Cf93c30b34B1ed04B;
+    address newDebtToken = 0x786dBff3f1292ae8F92ea68Cf93c30b34B1ed04B; // vDebtGHO
 
     uint256 supplyAmount = 120e18;
     uint256 borrowAmount = 80e18;
@@ -79,8 +79,8 @@ contract DebtSwapV3GHOTest is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        extraCollateralAsset: address(0), // Passing nothing as extraCollateral
-        extraCollateralAmount: 0, // Passing nothing as extraCollateralAmount
+        extraCollateralAsset: address(0),
+        extraCollateralAmount: 0,
         offset: psp.offset,
         paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });
@@ -217,14 +217,15 @@ contract DebtSwapV3GHOTest is BaseTest {
   }
 
   function test_Gho_debtSwap_extra_collateral() public {
-    // We'll use the debtAsset & supplyAmount as extra collateral too.
-    address aToken = AaveV3EthereumAssets.DAI_A_TOKEN;
     address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
     address newDebtAsset = debtSwapAdapter.GHO();
     address newDebtToken = 0x786dBff3f1292ae8F92ea68Cf93c30b34B1ed04B;
+    address extraCollateralAsset = debtAsset;
+    address extraCollateralAToken = AaveV3EthereumAssets.DAI_A_TOKEN;
 
     uint256 supplyAmount = 120e18;
     uint256 borrowAmount = 80e18;
+    uint256 extraCollateralAmount = 1000e18;
 
     // We want to end with LT > utilisation > LTV, so we pump up the utilisation to 75% by withdrawing (80 > 75 > 67).
     uint256 withdrawAmount = supplyAmount - (borrowAmount * 100) / 75;
@@ -257,7 +258,7 @@ contract DebtSwapV3GHOTest is BaseTest {
     skip(1 hours);
 
     ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
-    IERC20Detailed(aToken).approve(address(debtSwapAdapter), supplyAmount);
+    IERC20Detailed(extraCollateralAToken).approve(address(debtSwapAdapter), extraCollateralAmount);
 
     IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
       .DebtSwapParams({
@@ -266,8 +267,8 @@ contract DebtSwapV3GHOTest is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        extraCollateralAsset: debtAsset, // Passing the debtAsset as extraCollateral
-        extraCollateralAmount: supplyAmount, // Passing the supplyAmount as extraCollateral
+        extraCollateralAsset: extraCollateralAsset,
+        extraCollateralAmount: extraCollateralAmount,
         offset: psp.offset,
         paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });

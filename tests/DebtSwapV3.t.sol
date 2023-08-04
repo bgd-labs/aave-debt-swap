@@ -108,8 +108,8 @@ contract DebtSwapV3Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        extraCollateralAsset: address(0), // Passing nothing as extraCollateral
-        extraCollateralAmount: 0, // Passing nothing as extraCollateralAmount
+        extraCollateralAsset: address(0),
+        extraCollateralAmount: 0,
         offset: psp.offset,
         paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });
@@ -356,14 +356,15 @@ contract DebtSwapV3Test is BaseTest {
   }
 
   function test_debtSwap_extra_Collateral() public {
-    // We'll use the debtAsset & supplyAmount as extra collateral too.
-    address aToken = AaveV3EthereumAssets.DAI_A_TOKEN;
     address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
     address newDebtAsset = AaveV3EthereumAssets.LUSD_UNDERLYING;
     address newDebtToken = AaveV3EthereumAssets.LUSD_V_TOKEN;
+    address extraCollateralAsset = debtAsset;
+    address extraCollateralAToken = AaveV3EthereumAssets.DAI_A_TOKEN;
 
     uint256 supplyAmount = 120e18;
     uint256 borrowAmount = 80e18;
+    uint256 extraCollateralAmount = 1000e18;
 
     // We want to end with LT > utilisation > LTV, so we pump up the utilisation to 75% by withdrawing (80 > 75 > 67).
     uint256 withdrawAmount = supplyAmount - (borrowAmount * 100) / 75;
@@ -396,7 +397,10 @@ contract DebtSwapV3Test is BaseTest {
     skip(1 hours);
 
     ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
-    IERC20Detailed(aToken).approve(address(debtSwapAdapter), supplyAmount);
+    IERC20Detailed(extraCollateralAToken).approve(
+      address(debtSwapAdapter),
+      extraCollateralAmount + 1
+    );
 
     IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
       .DebtSwapParams({
@@ -405,8 +409,73 @@ contract DebtSwapV3Test is BaseTest {
         debtRateMode: 2,
         newDebtAsset: newDebtAsset,
         maxNewDebtAmount: psp.srcAmount,
-        extraCollateralAsset: debtAsset, // Passing the debtAsset as extraCollateral
-        extraCollateralAmount: supplyAmount, // Passing the supplyAmount as extraCollateral
+        extraCollateralAsset: extraCollateralAsset,
+        extraCollateralAmount: extraCollateralAmount,
+        offset: psp.offset,
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+      });
+
+    IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
+    debtSwapAdapter.swapDebt(debtSwapParams, cd);
+  }
+
+  function test_debtSwap_extra_Collateral_same_as_new_debt() public {
+    // We'll use the debtAsset & supplyAmount as extra collateral too.
+    address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
+    address newDebtAsset = AaveV3EthereumAssets.USDC_UNDERLYING;
+    address newDebtToken = AaveV3EthereumAssets.USDC_V_TOKEN;
+    address extraCollateralAsset = newDebtAsset;
+    address extraCollateralAToken = AaveV3EthereumAssets.USDC_A_TOKEN;
+
+    uint256 supplyAmount = 120e18;
+    uint256 borrowAmount = 80e18;
+    uint256 extraCollateralAmount = 1000e6;
+
+    // We want to end with LT > utilisation > LTV, so we pump up the utilisation to 75% by withdrawing (80 > 75 > 67).
+    uint256 withdrawAmount = supplyAmount - (borrowAmount * 100) / 75;
+
+    // Deal some debtAsset to cover the premium and any 1 wei rounding errors on withdrawal.
+    deal(debtAsset, address(debtSwapAdapter), 1e18);
+
+    vm.startPrank(user);
+
+    _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
+    _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
+
+    _withdraw(AaveV3Ethereum.POOL, withdrawAmount, debtAsset);
+
+    vm.expectRevert(bytes(Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW));
+    _borrow(AaveV3Ethereum.POOL, 1, debtAsset);
+    
+    // Swap debt
+    // add some margin to account for accumulated debt
+    uint256 repayAmount = (borrowAmount * 101) / 100;
+    PsPResponse memory psp = _fetchPSPRoute(
+      newDebtAsset,
+      debtAsset,
+      repayAmount,
+      user,
+      false,
+      true
+    );
+
+    skip(1 hours);
+
+    ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
+    IERC20Detailed(extraCollateralAToken).approve(
+      address(debtSwapAdapter),
+      extraCollateralAmount + 1
+    );
+
+    IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
+      .DebtSwapParams({
+        debtAsset: debtAsset,
+        debtRepayAmount: type(uint256).max,
+        debtRateMode: 2,
+        newDebtAsset: newDebtAsset,
+        maxNewDebtAmount: psp.srcAmount,
+        extraCollateralAsset: extraCollateralAsset,
+        extraCollateralAmount: extraCollateralAmount,
         offset: psp.offset,
         paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
       });

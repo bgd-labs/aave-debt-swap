@@ -78,7 +78,7 @@ abstract contract ParaSwapDebtSwapAdapter is
     }
     // flash & repay
     if (debtSwapParams.debtRepayAmount == type(uint256).max) {
-      (address vToken, address sToken) = _getReserveData(debtSwapParams.debtAsset);
+      (address vToken, address sToken, ) = _getReserveData(debtSwapParams.debtAsset);
       debtSwapParams.debtRepayAmount = debtSwapParams.debtRateMode == 2
         ? IERC20WithPermit(vToken).balanceOf(msg.sender)
         : IERC20WithPermit(sToken).balanceOf(msg.sender);
@@ -169,7 +169,7 @@ abstract contract ParaSwapDebtSwapAdapter is
       uint256 collateralAmount = amounts[0];
 
       // Supply
-      POOL.supply(collateralAsset, collateralAmount, flashParams.user, REFERRER);
+      _supply(collateralAsset, collateralAmount, flashParams.user, REFERRER);
 
       // Execute the nested flashloan
       address newAsset = flashParams.nestedFlashloanDebtAsset;
@@ -177,7 +177,7 @@ abstract contract ParaSwapDebtSwapAdapter is
       _flash(flashParams, newAsset, flashParams.nestedFlashloanDebtAmount);
 
       // Fetch and transfer back in the aToken to allow the pool to pull it.
-      address aToken = POOL.getReserveData(collateralAsset).aTokenAddress;
+      (, , address aToken) = _getReserveData(collateralAsset);
       IERC20WithPermit(aToken).safeTransferFrom(flashParams.user, address(this), collateralAmount); // Could be rounding error but it's insignificant
       POOL.withdraw(collateralAsset, collateralAmount, address(this));
       _conditionalRenewAllowance(collateralAsset, collateralAmount);
