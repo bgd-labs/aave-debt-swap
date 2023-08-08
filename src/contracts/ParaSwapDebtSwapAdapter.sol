@@ -58,10 +58,12 @@ abstract contract ParaSwapDebtSwapAdapter is
    * 4. repay old debt
    * @param debtSwapParams the parameters describing the swap
    * @param creditDelegationPermit optional permit for credit delegation
+   * @param collateralATokenPermit optional permit for collateral aToken
    */
   function swapDebt(
     DebtSwapParams memory debtSwapParams,
-    CreditDelegationInput memory creditDelegationPermit
+    CreditDelegationInput memory creditDelegationPermit,
+    PermitInput memory collateralATokenPermit
   ) external {
     uint256 excessBefore = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     // delegate credit
@@ -98,6 +100,18 @@ abstract contract ParaSwapDebtSwapAdapter is
     address assetToFlash;
     uint256 amountToFlash;
     if (debtSwapParams.extraCollateralAsset != address(0)) {
+      // Permit collateral aToken if needed.
+      if (collateralATokenPermit.deadline != 0) {
+        collateralATokenPermit.token.permit(
+          msg.sender,
+          address(this),
+          collateralATokenPermit.value,
+          collateralATokenPermit.deadline,
+          collateralATokenPermit.v,
+          collateralATokenPermit.r,
+          collateralATokenPermit.s
+        );
+      }
       assetToFlash = debtSwapParams.extraCollateralAsset;
       amountToFlash = debtSwapParams.extraCollateralAmount;
       flashParams.nestedFlashloanDebtAsset = debtSwapParams.newDebtAsset;

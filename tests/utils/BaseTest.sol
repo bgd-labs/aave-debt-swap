@@ -5,8 +5,11 @@ import 'forge-std/Test.sol';
 import {AaveV3Polygon} from 'aave-address-book/AaveV3Polygon.sol';
 import {DataTypes} from 'aave-address-book/AaveV3.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
+import {IParaswapDebtSwapAdapter} from '../../src/interfaces/IParaswapDebtSwapAdapter.sol';
+import {IERC20WithPermit} from 'solidity-utils/contracts/oz-common/interfaces/IERC20WithPermit.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
+import {SigUtils} from './SigUtils.sol';
 
 contract BaseTest is Test {
   struct PsPResponse {
@@ -65,4 +68,44 @@ contract BaseTest is Test {
       'LEFTOVER_NEW_DEBT_ASSET'
     );
   }
+
+  function _getPermit(
+    address permitToken,
+    address debtSwapAdapter,
+    uint256 amount
+  ) internal view returns (IParaswapDebtSwapAdapter.PermitInput memory) {
+    IERC20WithPermit token = IERC20WithPermit(permitToken);
+    uint256 nonce;
+    try IERC20WithPermit(token).nonces(user) returns (uint256 res) {
+      nonce = res;
+    } catch {
+      nonce = IATokenV2(address(token))._nonces(user);
+    }
+
+    SigUtils.Permit memory permit = SigUtils.Permit({
+      owner: user,
+      spender: address(debtSwapAdapter),
+      value: amount,
+      nonce: nonce,
+      deadline: type(uint256).max
+    });
+
+    bytes32 digest = SigUtils.getTypedDataHash(permit, token.DOMAIN_SEPARATOR());
+
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPrivateKey, digest);
+
+    return
+      IParaswapDebtSwapAdapter.PermitInput({
+        token: token,
+        value: amount,
+        deadline: type(uint256).max,
+        v: v,
+        r: r,
+        s: s
+      });
+  }
+}
+
+interface IATokenV2 {
+  function _nonces(address user) external view returns (uint256);
 }

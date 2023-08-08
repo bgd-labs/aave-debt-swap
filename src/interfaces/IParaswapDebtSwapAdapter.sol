@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 import {ICreditDelegationToken} from './ICreditDelegationToken.sol';
+import {IERC20WithPermit} from 'solidity-utils/contracts/oz-common/interfaces/IERC20WithPermit.sol';
 
 interface IParaswapDebtSwapAdapter {
   struct FlashParams {
@@ -35,13 +36,24 @@ interface IParaswapDebtSwapAdapter {
     bytes32 s;
   }
 
+  struct PermitInput {
+    IERC20WithPermit token;
+    uint256 value;
+    uint256 deadline;
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+  }
+
   /**
    * @dev swaps debt from one asset to another
    * @param debtSwapParams struct describing the debt swap
    * @param creditDelegationPermit optional permit for credit delegation
+   * @param collateralATokenPermit optional permit for collateral aToken
    */
   function swapDebt(
     DebtSwapParams memory debtSwapParams,
-    CreditDelegationInput memory creditDelegationPermit
+    CreditDelegationInput memory creditDelegationPermit,
+    PermitInput memory collateralATokenPermit
   ) external;
 }

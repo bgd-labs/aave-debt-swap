@@ -86,9 +86,10 @@ contract DebtSwapV3GHOTest is BaseTest {
       });
 
     IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
+    IParaswapDebtSwapAdapter.PermitInput memory collateralATokenPermit;
 
     vm.expectRevert(bytes(Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW));
-    debtSwapAdapter.swapDebt(debtSwapParams, cd);
+    debtSwapAdapter.swapDebt(debtSwapParams, cd, collateralATokenPermit);
   }
 
   function test_revert_Gho_onFlashloan_not_minter() public {
@@ -156,7 +157,8 @@ contract DebtSwapV3GHOTest is BaseTest {
     uint256 vDEBT_TOKENBalanceBefore = IERC20Detailed(debtToken).balanceOf(user);
 
     IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
-    debtSwapAdapter.swapDebt(debtSwapParams, cd);
+    IParaswapDebtSwapAdapter.PermitInput memory collateralATokenPermit;
+    debtSwapAdapter.swapDebt(debtSwapParams, cd, collateralATokenPermit);
 
     uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(user);
     uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(user);
@@ -207,7 +209,9 @@ contract DebtSwapV3GHOTest is BaseTest {
       });
 
     IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
-    debtSwapAdapter.swapDebt(debtSwapParams, cd);
+    IParaswapDebtSwapAdapter.PermitInput memory collateralATokenPermit;
+
+    debtSwapAdapter.swapDebt(debtSwapParams, cd, collateralATokenPermit);
 
     uint256 vDEBT_TOKENBalanceAfter = IERC20Detailed(debtToken).balanceOf(user);
     uint256 vNEWDEBT_TOKENBalanceAfter = IERC20Detailed(newDebtToken).balanceOf(user);
@@ -274,7 +278,75 @@ contract DebtSwapV3GHOTest is BaseTest {
       });
 
     IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
-    debtSwapAdapter.swapDebt(debtSwapParams, cd);
+    IParaswapDebtSwapAdapter.PermitInput memory collateralATokenPermit;
+
+    debtSwapAdapter.swapDebt(debtSwapParams, cd, collateralATokenPermit);
+  }
+
+  function test_Gho_debtSwap_extra_collateral_permit() public {
+    address debtAsset = AaveV3EthereumAssets.DAI_UNDERLYING;
+    address newDebtAsset = debtSwapAdapter.GHO();
+    address newDebtToken = 0x786dBff3f1292ae8F92ea68Cf93c30b34B1ed04B;
+    address extraCollateralAsset = debtAsset;
+    address extraCollateralAToken = AaveV3EthereumAssets.DAI_A_TOKEN;
+
+    uint256 supplyAmount = 120e18;
+    uint256 borrowAmount = 80e18;
+    uint256 extraCollateralAmount = 1000e18;
+
+    // We want to end with LT > utilisation > LTV, so we pump up the utilisation to 75% by withdrawing (80 > 75 > 67).
+    uint256 withdrawAmount = supplyAmount - (borrowAmount * 100) / 75;
+
+    // Deal some debtAsset to cover the premium and any 1 wei rounding errors on withdrawal.
+    deal(debtAsset, address(debtSwapAdapter), 1e18);
+
+    vm.startPrank(user);
+
+    _supply(AaveV3Ethereum.POOL, supplyAmount, debtAsset);
+    _borrow(AaveV3Ethereum.POOL, borrowAmount, debtAsset);
+
+    _withdraw(AaveV3Ethereum.POOL, withdrawAmount, debtAsset);
+
+    vm.expectRevert(bytes(Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW));
+    _borrow(AaveV3Ethereum.POOL, 1, debtAsset);
+
+    // Swap debt
+    // add some margin to account for accumulated debt
+    uint256 repayAmount = (borrowAmount * 101) / 100;
+    PsPResponse memory psp = _fetchPSPRoute(
+      newDebtAsset,
+      debtAsset,
+      repayAmount,
+      user,
+      false,
+      true
+    );
+
+    skip(1 hours);
+
+    ICreditDelegationToken(newDebtToken).approveDelegation(address(debtSwapAdapter), psp.srcAmount);
+
+    IParaswapDebtSwapAdapter.DebtSwapParams memory debtSwapParams = IParaswapDebtSwapAdapter
+      .DebtSwapParams({
+        debtAsset: debtAsset,
+        debtRepayAmount: type(uint256).max,
+        debtRateMode: 2,
+        newDebtAsset: newDebtAsset,
+        maxNewDebtAmount: psp.srcAmount,
+        extraCollateralAsset: extraCollateralAsset,
+        extraCollateralAmount: extraCollateralAmount,
+        offset: psp.offset,
+        paraswapData: abi.encode(psp.swapCalldata, psp.augustus)
+      });
+
+    IParaswapDebtSwapAdapter.CreditDelegationInput memory cd;
+    IParaswapDebtSwapAdapter.PermitInput memory collateralATokenPermit = _getPermit(
+      extraCollateralAToken,
+      address(debtSwapAdapter),
+      extraCollateralAmount + 1
+    );
+
+    debtSwapAdapter.swapDebt(debtSwapParams, cd, collateralATokenPermit);
   }
 
   function _getCDPermit(
