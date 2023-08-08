@@ -37,6 +37,6 @@ contract ParaSwapDebtSwapAdapterV3 is ParaSwapDebtSwapAdapter {
     address to,
     uint16 referralCode
   ) internal override {
-    POOL.deposit(asset, amount, to, referralCode);
+    POOL.supply(asset, amount, to, referralCode);
   }
 }
