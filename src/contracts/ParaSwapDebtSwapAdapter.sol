@@ -97,8 +97,6 @@ abstract contract ParaSwapDebtSwapAdapter is
     );
 
     // If we need extra collateral, execute the flashloan with the collateral instead of the debt.
-    address assetToFlash;
-    uint256 amountToFlash;
     if (debtSwapParams.extraCollateralAsset != address(0)) {
       // Permit collateral aToken if needed.
       if (collateralATokenPermit.deadline != 0) {
@@ -112,16 +110,16 @@ abstract contract ParaSwapDebtSwapAdapter is
           collateralATokenPermit.s
         );
       }
-      assetToFlash = debtSwapParams.extraCollateralAsset;
-      amountToFlash = debtSwapParams.extraCollateralAmount;
       flashParams.nestedFlashloanDebtAsset = debtSwapParams.newDebtAsset;
       flashParams.nestedFlashloanDebtAmount = debtSwapParams.maxNewDebtAmount;
+      _flash(
+        flashParams,
+        debtSwapParams.extraCollateralAsset,
+        debtSwapParams.extraCollateralAmount
+      );
     } else {
-      assetToFlash = debtSwapParams.newDebtAsset;
-      amountToFlash = debtSwapParams.maxNewDebtAmount;
+      _flash(flashParams, debtSwapParams.newDebtAsset, debtSwapParams.maxNewDebtAmount);
     }
-
-    _flash(flashParams, assetToFlash, amountToFlash);
 
     // use excess to repay parts of flash debt
     uint256 excessAfter = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
