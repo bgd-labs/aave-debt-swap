@@ -78,25 +78,27 @@ abstract contract ParaSwapDebtSwapAdapter is
         creditDelegationPermit.s
       );
     }
-    // flash & repay
-    if (debtSwapParams.debtRepayAmount == type(uint256).max) {
-      (address vToken, address sToken, ) = _getReserveData(debtSwapParams.debtAsset);
-      debtSwapParams.debtRepayAmount = debtSwapParams.debtRateMode == 2
-        ? IERC20WithPermit(vToken).balanceOf(msg.sender)
-        : IERC20WithPermit(sToken).balanceOf(msg.sender);
+    // Default to the entire debt if an amount greater than it is passed.
+    (address vToken, address sToken, ) = _getReserveData(debtSwapParams.debtAsset);
+    uint256 maxDebtRepayAmount = debtSwapParams.debtRateMode == 2
+      ? IERC20WithPermit(vToken).balanceOf(msg.sender)
+      : IERC20WithPermit(sToken).balanceOf(msg.sender);
+
+    if (debtSwapParams.debtRepayAmount > maxDebtRepayAmount) {
+      debtSwapParams.debtRepayAmount = maxDebtRepayAmount;
     }
     FlashParams memory flashParams = FlashParams(
       debtSwapParams.debtAsset,
       debtSwapParams.debtRepayAmount,
       debtSwapParams.debtRateMode,
-      address(0), // debtSwapParams.newDebtAsset,
-      0, //debtSwapParams.maxNewDebtAmount,
+      address(0),
+      0,
       debtSwapParams.paraswapData,
       debtSwapParams.offset,
       msg.sender
     );
 
-    // If we need extra collateral, execute the flashloan with the collateral instead of the debt.
+    // If we need extra collateral, execute the flashloan with the collateral asset instead of the debt asset.
     if (debtSwapParams.extraCollateralAsset != address(0)) {
       // Permit collateral aToken if needed.
       if (collateralATokenPermit.deadline != 0) {
@@ -112,12 +114,14 @@ abstract contract ParaSwapDebtSwapAdapter is
       }
       flashParams.nestedFlashloanDebtAsset = debtSwapParams.newDebtAsset;
       flashParams.nestedFlashloanDebtAmount = debtSwapParams.maxNewDebtAmount;
+      // Execute the flashloan with the extra collateral asset.
       _flash(
         flashParams,
         debtSwapParams.extraCollateralAsset,
         debtSwapParams.extraCollateralAmount
       );
     } else {
+      // Execute the flashloan with the debt asset.
       _flash(flashParams, debtSwapParams.newDebtAsset, debtSwapParams.maxNewDebtAmount);
     }
 
