@@ -58,10 +58,12 @@ abstract contract ParaSwapDebtSwapAdapter is
    * 4. repay old debt
    * @param debtSwapParams the parameters describing the swap
    * @param creditDelegationPermit optional permit for credit delegation
+   * @param collateralATokenPermit optional permit for collateral aToken
    */
   function swapDebt(
     DebtSwapParams memory debtSwapParams,
-    CreditDelegationInput memory creditDelegationPermit
+    CreditDelegationInput memory creditDelegationPermit,
+    PermitInput memory collateralATokenPermit
   ) external {
     uint256 excessBefore = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     // delegate credit
@@ -76,49 +78,82 @@ abstract contract ParaSwapDebtSwapAdapter is
         creditDelegationPermit.s
       );
     }
-    // flash & repay
-    if (debtSwapParams.debtRepayAmount == type(uint256).max) {
-      (address vToken, address sToken) = _getReserveData(debtSwapParams.debtAsset);
-      debtSwapParams.debtRepayAmount = debtSwapParams.debtRateMode == 2
-        ? IERC20WithPermit(vToken).balanceOf(msg.sender)
-        : IERC20WithPermit(sToken).balanceOf(msg.sender);
+    // Default to the entire debt if an amount greater than it is passed.
+    (address vToken, address sToken, ) = _getReserveData(debtSwapParams.debtAsset);
+    uint256 maxDebtRepayAmount = debtSwapParams.debtRateMode == 2
+      ? IERC20WithPermit(vToken).balanceOf(msg.sender)
+      : IERC20WithPermit(sToken).balanceOf(msg.sender);
+
+    if (debtSwapParams.debtRepayAmount > maxDebtRepayAmount) {
+      debtSwapParams.debtRepayAmount = maxDebtRepayAmount;
     }
     FlashParams memory flashParams = FlashParams(
       debtSwapParams.debtAsset,
       debtSwapParams.debtRepayAmount,
       debtSwapParams.debtRateMode,
+      address(0),
+      0,
       debtSwapParams.paraswapData,
       debtSwapParams.offset,
       msg.sender
     );
-    _flash(flashParams, debtSwapParams);
+
+    // If we need extra collateral, execute the flashloan with the collateral asset instead of the debt asset.
+    if (debtSwapParams.extraCollateralAsset != address(0)) {
+      // Permit collateral aToken if needed.
+      if (collateralATokenPermit.deadline != 0) {
+        collateralATokenPermit.aToken.permit(
+          msg.sender,
+          address(this),
+          collateralATokenPermit.value,
+          collateralATokenPermit.deadline,
+          collateralATokenPermit.v,
+          collateralATokenPermit.r,
+          collateralATokenPermit.s
+        );
+      }
+      flashParams.nestedFlashloanDebtAsset = debtSwapParams.newDebtAsset;
+      flashParams.nestedFlashloanDebtAmount = debtSwapParams.maxNewDebtAmount;
+      // Execute the flashloan with the extra collateral asset.
+      _flash(
+        flashParams,
+        debtSwapParams.extraCollateralAsset,
+        debtSwapParams.extraCollateralAmount
+      );
+    } else {
+      // Execute the flashloan with the debt asset.
+      _flash(flashParams, debtSwapParams.newDebtAsset, debtSwapParams.maxNewDebtAmount);
+    }
+
     // use excess to repay parts of flash debt
     uint256 excessAfter = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
     uint256 excess = excessAfter - excessBefore;
     if (excess > 0) {
-      uint256 allowance = IERC20(debtSwapParams.newDebtAsset).allowance(
-        address(this),
-        address(POOL)
-      );
-      if (allowance < excess) {
-        renewAllowance(debtSwapParams.newDebtAsset);
-      }
+      _conditionalRenewAllowance(debtSwapParams.newDebtAsset, excess);
       POOL.repay(debtSwapParams.newDebtAsset, excess, 2, msg.sender);
     }
   }
 
-  function _flash(
-    FlashParams memory flashParams,
-    DebtSwapParams memory debtSwapParams
-  ) internal virtual {
+  function _flash(FlashParams memory flashParams, address asset, uint256 amount) internal virtual {
     bytes memory params = abi.encode(flashParams);
+
     address[] memory assets = new address[](1);
-    assets[0] = debtSwapParams.newDebtAsset;
+    assets[0] = asset;
     uint256[] memory amounts = new uint256[](1);
-    amounts[0] = debtSwapParams.maxNewDebtAmount;
+    amounts[0] = amount;
     uint256[] memory interestRateModes = new uint256[](1);
-    interestRateModes[0] = 2;
-    POOL.flashLoan(address(this), assets, amounts, interestRateModes, msg.sender, params, REFERRER);
+    // This is only true if there is no need for extra collateral.
+    interestRateModes[0] = flashParams.nestedFlashloanDebtAsset == address(0) ? 2 : 0;
+
+    POOL.flashLoan(
+      address(this),
+      assets,
+      amounts,
+      interestRateModes,
+      flashParams.user,
+      params,
+      REFERRER
+    );
   }
 
   /**
@@ -141,9 +176,34 @@ abstract contract ParaSwapDebtSwapAdapter is
     require(msg.sender == address(POOL), 'CALLER_MUST_BE_POOL');
     require(initiator == address(this), 'INITIATOR_MUST_BE_THIS');
 
-    FlashParams memory swapParams = abi.decode(params, (FlashParams));
-    _swapAndRepay(swapParams, IERC20Detailed(assets[0]), amounts[0]);
+    FlashParams memory flashParams = abi.decode(params, (FlashParams));
 
+    // This is only non-zero if we flashed extra collateral.
+    if (flashParams.nestedFlashloanDebtAsset != address(0)) {
+      // Wrap the swap with a supply and withdraw.
+      address collateralAsset = assets[0];
+      uint256 collateralAmount = amounts[0];
+
+      // Supply
+      _supply(collateralAsset, collateralAmount, flashParams.user, REFERRER);
+
+      // Execute the nested flashloan
+      address newAsset = flashParams.nestedFlashloanDebtAsset;
+      flashParams.nestedFlashloanDebtAsset = address(0);
+      _flash(flashParams, newAsset, flashParams.nestedFlashloanDebtAmount);
+
+      // Fetch and transfer back in the aToken to allow the pool to pull it.
+      (, , address aToken) = _getReserveData(collateralAsset);
+      IERC20WithPermit(aToken).safeTransferFrom(flashParams.user, address(this), collateralAmount); // Could be rounding error but it's insignificant
+      POOL.withdraw(collateralAsset, collateralAmount, address(this));
+      _conditionalRenewAllowance(collateralAsset, collateralAmount);
+
+      // Return out of this scope.
+      return true;
+    }
+
+    // There is no need for additional collateral, execute the swap.
+    _swapAndRepay(flashParams, IERC20Detailed(assets[0]), amounts[0]);
     return true;
   }
 
@@ -167,10 +227,7 @@ abstract contract ParaSwapDebtSwapAdapter is
       swapParams.debtRepayAmount
     );
 
-    uint256 allowance = IERC20(swapParams.debtAsset).allowance(address(this), address(POOL));
-    if (allowance < swapParams.debtRepayAmount) {
-      renewAllowance(address(swapParams.debtAsset));
-    }
+    _conditionalRenewAllowance(swapParams.debtAsset, swapParams.debtRepayAmount);
 
     POOL.repay(
       address(swapParams.debtAsset),
@@ -179,5 +236,12 @@ abstract contract ParaSwapDebtSwapAdapter is
       swapParams.user
     );
     return amountSold;
+  }
+
+  function _conditionalRenewAllowance(address asset, uint256 minAmount) internal {
+    uint256 allowance = IERC20(asset).allowance(address(this), address(POOL));
+    if (allowance < minAmount) {
+      renewAllowance(asset);
+    }
   }
 }

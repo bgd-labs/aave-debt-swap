@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import 'forge-std/Test.sol';
-import {IAToken} from '@aave/core-v3/contracts/interfaces/IAToken.sol';
 import {BaseParaSwapAdapter} from '../../src/contracts/BaseParaSwapAdapter.sol';
 
 library SigUtils {
@@ -46,7 +44,7 @@ library SigUtils {
   function getPermitTypedDataHash(
     Permit memory _permit,
     bytes32 domainSeparator
-  ) public pure returns (bytes32) {
+  ) internal pure returns (bytes32) {
     return
       keccak256(
         abi.encodePacked(
@@ -69,7 +67,7 @@ library SigUtils {
   function getCreditDelegationTypedDataHash(
     CreditDelegation memory _creditDelegation,
     bytes32 domainSeparator
-  ) public pure returns (bytes32) {
+  ) internal pure returns (bytes32) {
     return
       keccak256(
         abi.encodePacked(
@@ -92,34 +90,7 @@ library SigUtils {
   function getTypedDataHash(
     Permit memory permit,
     bytes32 domainSeperator
-  ) public pure returns (bytes32) {
+  ) internal pure returns (bytes32) {
     return keccak256(abi.encodePacked('\x19\x01', domainSeperator, getStructHash(permit)));
-  }
-
-  function getPermit(
-    Vm vm,
-    address user,
-    uint256 userPrivateKey,
-    address spender,
-    address token,
-    uint256 value
-  ) public returns (BaseParaSwapAdapter.PermitSignature memory) {
-    Permit memory permit = Permit({
-      owner: user,
-      spender: spender,
-      value: value,
-      nonce: IAToken(token).nonces(user),
-      deadline: block.timestamp + 1 days
-    });
-    bytes32 permitDigest = getTypedDataHash(permit, IAToken(token).DOMAIN_SEPARATOR());
-    (uint8 pV, bytes32 pR, bytes32 pS) = vm.sign(userPrivateKey, permitDigest);
-    return
-      BaseParaSwapAdapter.PermitSignature({
-        amount: permit.value,
-        deadline: permit.deadline,
-        v: pV,
-        r: pR,
-        s: pS
-      });
   }
 }

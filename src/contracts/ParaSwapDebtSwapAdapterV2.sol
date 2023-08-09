@@ -19,8 +19,21 @@ contract ParaSwapDebtSwapAdapterV2 is ParaSwapDebtSwapAdapter {
     address owner
   ) ParaSwapDebtSwapAdapter(addressesProvider, pool, augustusRegistry, owner) {}
 
-  function _getReserveData(address asset) internal view override returns (address, address) {
+  function _getReserveData(address asset) internal view override returns (address, address, address) {
     DataTypes.ReserveData memory reserveData = ILendingPool(address(POOL)).getReserveData(asset);
-    return (reserveData.variableDebtTokenAddress, reserveData.stableDebtTokenAddress);
+    return (
+      reserveData.variableDebtTokenAddress,
+      reserveData.stableDebtTokenAddress,
+      reserveData.aTokenAddress
+    );
+  }
+
+  function _supply(
+    address asset,
+    uint256 amount,
+    address to,
+    uint16 referralCode
+  ) internal override {
+    ILendingPool(address(POOL)).deposit(asset, amount, to, referralCode);
   }
 }
