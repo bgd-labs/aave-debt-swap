@@ -102,7 +102,7 @@ abstract contract ParaSwapDebtSwapAdapter is
     if (debtSwapParams.extraCollateralAsset != address(0)) {
       // Permit collateral aToken if needed.
       if (collateralATokenPermit.deadline != 0) {
-        collateralATokenPermit.token.permit(
+        collateralATokenPermit.aToken.permit(
           msg.sender,
           address(this),
           collateralATokenPermit.value,

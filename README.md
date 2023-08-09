@@ -27,7 +27,9 @@ In situations where a user's real loan-to-value (LTV) is higher than their maxim
 
 Notice how steps 3, 4, 5, and 7 are the same four steps from the collateral-less flow.
 
-The `function swapDebt( DebtSwapParams memory debtSwapParams, CreditDelegationInput memory creditDelegationPermit )` expects two parameters.
+In order to select adequate extra collateral asset and amount parameters, consider the extra collateral's LTV and supply cap. Where possible, it is recommended to use the from/to debt asset in order to reduce gas costs.
+
+The `function swapDebt(DebtSwapParams memory debtSwapParams, CreditDelegationInput memory creditDelegationPermit, PermitInput memory collateralATokenPermit)` expects three parameters.
 
 The first one describes the swap:
 
@@ -57,6 +59,19 @@ struct CreditDelegationInput {
   bytes32 s;
 }
 
+```
+
+The third one describes the (optional) collateral aToken permit:
+
+```solidity
+struct PermitInput {
+  IERC20WithPermit aToken;
+  uint256 value;
+  uint256 deadline;
+  uint8 v;
+  bytes32 r;
+  bytes32 s;
+}
 ```
 
 For usage examples please check the [tests](./tests/).

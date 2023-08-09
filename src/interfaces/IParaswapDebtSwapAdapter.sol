@@ -37,7 +37,7 @@ interface IParaswapDebtSwapAdapter {
   }
 
   struct PermitInput {
-    IERC20WithPermit token;
+    IERC20WithPermit aToken;
     uint256 value;
     uint256 deadline;
     uint8 v;

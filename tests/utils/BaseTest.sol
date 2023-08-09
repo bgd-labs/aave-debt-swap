@@ -96,7 +96,7 @@ contract BaseTest is Test {
 
     return
       IParaswapDebtSwapAdapter.PermitInput({
-        token: token,
+        aToken: token,
         value: amount,
         deadline: type(uint256).max,
         v: v,
