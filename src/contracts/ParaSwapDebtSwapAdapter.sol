@@ -51,7 +51,7 @@ abstract contract ParaSwapDebtSwapAdapter is
   }
 
   /**
-   * @dev Swaps one type of debt to another. Therfore this methods performs the following actions in order:
+   * @dev Swaps one type of debt to another. Therefore this methods performs the following actions in order:
    * 1. Delegate credit in new debt
    * 2. Flashloan in new debt
    * 3. swap new debt to old debt

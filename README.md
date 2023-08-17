@@ -1,7 +1,7 @@
 # BGD labs <> Aave Debt Swap Adapter
 
 This repository contains the [ParaSwapDebtSwapAdapter](./src/contracts/ParaSwapDebtSwapAdapter.sol), which aims to allow users to arbitrage borrow APY and exit illiquid debt positions.
-Therefore this contract is able to swap one debt position to another debt position - either partially or completely.
+Therefore, this contract is able to swap one debt position to another debt position - either partially or completely.
 
 You could for example swap your `1000 BUSD` debt to `max(1010 USDC)` debt.
 In order to perform this task, `swapDebt`:
