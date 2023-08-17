@@ -197,13 +197,10 @@ abstract contract ParaSwapDebtSwapAdapter is
       IERC20WithPermit(aToken).safeTransferFrom(flashParams.user, address(this), collateralAmount); // Could be rounding error but it's insignificant
       POOL.withdraw(collateralAsset, collateralAmount, address(this));
       _conditionalRenewAllowance(collateralAsset, collateralAmount);
-
-      // Return out of this scope.
-      return true;
+    } else {
+      // There is no need for additional collateral, execute the swap.
+      _swapAndRepay(flashParams, IERC20Detailed(assets[0]), amounts[0]);
     }
-
-    // There is no need for additional collateral, execute the swap.
-    _swapAndRepay(flashParams, IERC20Detailed(assets[0]), amounts[0]);
     return true;
   }
 
