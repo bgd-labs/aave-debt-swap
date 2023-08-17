@@ -87,16 +87,16 @@ abstract contract ParaSwapDebtSwapAdapter is
     if (debtSwapParams.debtRepayAmount > maxDebtRepayAmount) {
       debtSwapParams.debtRepayAmount = maxDebtRepayAmount;
     }
-    FlashParams memory flashParams = FlashParams(
-      debtSwapParams.debtAsset,
-      debtSwapParams.debtRepayAmount,
-      debtSwapParams.debtRateMode,
-      address(0),
-      0,
-      debtSwapParams.paraswapData,
-      debtSwapParams.offset,
-      msg.sender
-    );
+    FlashParams memory flashParams = FlashParams({
+      debtAsset: debtSwapParams.debtAsset,
+      debtRepayAmount: debtSwapParams.debtRepayAmount,
+      debtRateMode: debtSwapParams.debtRateMode,
+      nestedFlashloanDebtAsset: address(0),
+      nestedFlashloanDebtAmount: 0,
+      paraswapData: debtSwapParams.paraswapData,
+      offset: debtSwapParams.offset,
+      user: msg.sender
+    });
 
     // If we need extra collateral, execute the flashloan with the collateral asset instead of the debt asset.
     if (debtSwapParams.extraCollateralAsset != address(0)) {
