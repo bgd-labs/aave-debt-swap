@@ -87,16 +87,16 @@ abstract contract ParaSwapDebtSwapAdapter is
     if (debtSwapParams.debtRepayAmount > maxDebtRepayAmount) {
       debtSwapParams.debtRepayAmount = maxDebtRepayAmount;
     }
-    FlashParams memory flashParams = FlashParams(
-      debtSwapParams.debtAsset,
-      debtSwapParams.debtRepayAmount,
-      debtSwapParams.debtRateMode,
-      address(0),
-      0,
-      debtSwapParams.paraswapData,
-      debtSwapParams.offset,
-      msg.sender
-    );
+    FlashParams memory flashParams = FlashParams({
+      debtAsset: debtSwapParams.debtAsset,
+      debtRepayAmount: debtSwapParams.debtRepayAmount,
+      debtRateMode: debtSwapParams.debtRateMode,
+      nestedFlashloanDebtAsset: address(0),
+      nestedFlashloanDebtAmount: 0,
+      paraswapData: debtSwapParams.paraswapData,
+      offset: debtSwapParams.offset,
+      user: msg.sender
+    });
 
     // If we need extra collateral, execute the flashloan with the collateral asset instead of the debt asset.
     if (debtSwapParams.extraCollateralAsset != address(0)) {
@@ -197,13 +197,10 @@ abstract contract ParaSwapDebtSwapAdapter is
       IERC20WithPermit(aToken).safeTransferFrom(flashParams.user, address(this), collateralAmount); // Could be rounding error but it's insignificant
       POOL.withdraw(collateralAsset, collateralAmount, address(this));
       _conditionalRenewAllowance(collateralAsset, collateralAmount);
-
-      // Return out of this scope.
-      return true;
+    } else {
+      // There is no need for additional collateral, execute the swap.
+      _swapAndRepay(flashParams, IERC20Detailed(assets[0]), amounts[0]);
     }
-
-    // There is no need for additional collateral, execute the swap.
-    _swapAndRepay(flashParams, IERC20Detailed(assets[0]), amounts[0]);
     return true;
   }
 
