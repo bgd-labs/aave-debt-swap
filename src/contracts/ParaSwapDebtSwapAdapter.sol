@@ -127,7 +127,9 @@ abstract contract ParaSwapDebtSwapAdapter is
 
     // use excess to repay parts of flash debt
     uint256 excessAfter = IERC20Detailed(debtSwapParams.newDebtAsset).balanceOf(address(this));
-    uint256 excess = excessAfter - excessBefore;
+    // with wrapped flashloans there is the chance of 1 wei inaccuracy on transfer & withdrawal
+    // this might lead to a slight excess decrease
+    uint256 excess = excessAfter > excessBefore ? excessAfter - excessBefore : 0;
     if (excess > 0) {
       _conditionalRenewAllowance(debtSwapParams.newDebtAsset, excess);
       POOL.repay(debtSwapParams.newDebtAsset, excess, 2, msg.sender);
