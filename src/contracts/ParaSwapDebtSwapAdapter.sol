@@ -171,7 +171,7 @@ abstract contract ParaSwapDebtSwapAdapter is
   function executeOperation(
     address[] calldata assets,
     uint256[] calldata amounts,
-    uint256[] calldata,
+    uint256[] calldata premiums,
     address initiator,
     bytes calldata params
   ) external returns (bool) {
@@ -192,7 +192,14 @@ abstract contract ParaSwapDebtSwapAdapter is
       // Execute the nested flashloan
       address newAsset = flashParams.nestedFlashloanDebtAsset;
       flashParams.nestedFlashloanDebtAsset = address(0);
-      _flash(flashParams, newAsset, flashParams.nestedFlashloanDebtAmount);
+      if (flashParams.nestedFlashloanDebtAsset == assets[0]) {
+        // will create some more debt to account for the flashloan premium so the upper flashloan can settle
+        _flash(flashParams, newAsset, flashParams.nestedFlashloanDebtAmount + premiums[0]);
+      } else {
+        // using a different collateral can only work when the fee is zero
+        require(premiums[0] == 0, 'PREMIUM_NON_ZERO');
+        _flash(flashParams, newAsset, flashParams.nestedFlashloanDebtAmount);
+      }
 
       // Fetch and transfer back in the aToken to allow the pool to pull it.
       (, , address aToken) = _getReserveData(collateralAsset);
