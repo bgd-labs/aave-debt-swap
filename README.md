@@ -27,7 +27,23 @@ In situations where a user's real loan-to-value (LTV) is higher than their maxim
 
 Notice how steps 3, 4, 5, and 7 are the same four steps from the collateral-less flow.
 
-In order to select adequate extra collateral asset and amount parameters, consider the extra collateral's LTV and supply cap. Where possible, it is recommended to use the from/to debt asset in order to reduce gas costs.
+In order to select adequate extra collateral asset and amount the following rules apply on `Aave V3`:
+
+1. **must not** be frozen
+2. has a lt & ltv >0
+3. **must not** be isolated
+   - except if the user is in isolation, then extra collateral **must** be the same isolated asset
+4. supply cap allows supplying the specified amount
+
+On `Aave V2`, due to limitations related to flashloan premium: TBD
+
+Where possible, it is recommended to use the:
+
+1. `fromDebt` asset
+2. `toDebt` asset
+3. an unrelated high ltv asset
+
+in order to reduce gas costs.
 
 The `function swapDebt(DebtSwapParams memory debtSwapParams, CreditDelegationInput memory creditDelegationPermit, PermitInput memory collateralATokenPermit)` expects three parameters.
 
@@ -72,6 +88,7 @@ struct PermitInput {
   bytes32 r;
   bytes32 s;
 }
+
 ```
 
 For usage examples please check the [tests](./tests/).
