@@ -43,6 +43,20 @@ For Aave V2:
 
 When possible, for both V2 and V3 deployments, use the from/to debt asset in order to reduce cold storage access costs and save gas.
 
+The recommended formula to determine the minimum amount of extra collateral is derived below:
+
+```
+USER_TOTAL_BORROW / (USER_OLD_COLLATERAL * OLD_COLLATERAL_LTV + EXTRA_COLLATERAL * EXTRA_COLLATERAL_ltv) = 1
+
+USER_OLD_COLLATERAL * OLD_COLLATERAL_LTV + EXTRA_COLLATERAL * EXTRA_COLLATERAL_LTV = USER_TOTAL_BORROW
+
+Therefore:
+
+EXTRA_COLLATERAL = USER_TOTAL_BORROW * EXTRA_COLLATERAL_LTV / (USER_OLD_COLLATERAL * OLD_COLLATERAL_LTV)
+```
+
+We recommend a margin to account for interest accrual and health factor fluctuation until execution.
+
 The `function swapDebt(DebtSwapParams memory debtSwapParams, CreditDelegationInput memory creditDelegationPermit, PermitInput memory collateralATokenPermit)` expects three parameters.
 
 The first one describes the swap:
