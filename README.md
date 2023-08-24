@@ -22,12 +22,26 @@ In situations where a user's real loan-to-value (LTV) is higher than their maxim
 3. Create the variable debt flashloan with the **target debt**(`1010 USDC`) on behalf of the user
 4. Swap the flashloaned target debt asset to the underlying of the **current debt**(`1000 BUSD`), needing only `1000.1 USDC`
 5. Repay the **current debt** (`1000 BUSD`)
-6. Repay the flashloaned collateral asset (requires `aToken` approval)
+6. Repay the flashloaned collateral asset and premium if needed (requires `aToken` approval)
 7. Use the remaining new debt asset (`9.9 USDC`) to repay parts of the newly created **target debt**
 
 Notice how steps 3, 4, 5, and 7 are the same four steps from the collateral-less flow.
 
-In order to select adequate extra collateral asset and amount parameters, consider the extra collateral's LTV and supply cap. Where possible, it is recommended to use the from/to debt asset in order to reduce gas costs.
+The guidelines for selecting a proper extra collateral asset are as follows:
+
+For Aave V3:
+1. Ensure that the potential asset's LTV is nonzero.
+2. Ensure that the potential asset's LT is nonzero.
+3. Ensure that the potential asset's Supply Cap has sufficient capacity.
+4. If the user is in isolation mode, ensure the asset is the same as the isolated collateral asset. 
+
+For Aave V2:
+1. Ensure that the potential asset's LTV is nonzero.
+2. Ensure that the potential asset's LT is nonzero.
+3. Ensure that the extra collateral asset is the same as the new debt asset.
+4. Ensure that the collateral flashloan premium is added to the `newDebtAmount`.
+
+When possible, for both V2 and V3 deployments, use the from/to debt asset in order to reduce cold storage access costs and save gas.
 
 The `function swapDebt(DebtSwapParams memory debtSwapParams, CreditDelegationInput memory creditDelegationPermit, PermitInput memory collateralATokenPermit)` expects three parameters.
 
