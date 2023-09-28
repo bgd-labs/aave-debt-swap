@@ -24,3 +24,5 @@ optimismv3 :; make deploy-ledger contract=scripts/Deploy.s.sol:OptimismV3 chain=
 
 ethereumv2 :; make deploy-ledger contract=scripts/Deploy.s.sol:EthereumV2 chain=mainnet
 ethereumv3 :; make deploy-ledger contract=scripts/Deploy.s.sol:EthereumV3 chain=mainnet
+
+basev3 :; make deploy-ledger contract=scripts/Deploy.s.sol:BaseV3 chain=base
