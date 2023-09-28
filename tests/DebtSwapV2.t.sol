@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
-import {Errors} from 'aave-helpers/dependencies/Errors.sol';
 import {AaveGovernanceV2} from 'aave-address-book/AaveGovernanceV2.sol';
+import {Errors} from 'aave-address-book/AaveV2.sol';
 import {AaveV2Ethereum, AaveV2EthereumAssets, ILendingPool} from 'aave-address-book/AaveV2Ethereum.sol';
 import {BaseTest} from './utils/BaseTest.sol';
 import {ICreditDelegationToken} from '../src/interfaces/ICreditDelegationToken.sol';
