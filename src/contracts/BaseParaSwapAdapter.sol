@@ -94,6 +94,41 @@ abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
   function _supply(address asset, uint256 amount, address to, uint16 referralCode) internal virtual;
 
   /**
+   * @dev Pull the ATokens from the user and withdraws the underlying asset from the POOL
+   * @param reserve address of the asset
+   * @param reserveAToken address of the aToken of the reserve
+   * @param user address
+   * @param amount of tokens to be transferred to the contract
+   * @param permitSignature struct containing the permit signature
+   */
+  function _pullATokenAndWithdraw(
+    address reserve,
+    IERC20WithPermit reserveAToken,
+    address user,
+    uint256 amount,
+    PermitSignature memory permitSignature
+  ) internal {
+    // If deadline is set to zero, assume there is no signature for permit
+    if (permitSignature.deadline != 0) {
+      reserveAToken.permit(
+        user,
+        address(this),
+        permitSignature.amount,
+        permitSignature.deadline,
+        permitSignature.v,
+        permitSignature.r,
+        permitSignature.s
+      );
+    }
+
+    // transfer from user to adapter
+    reserveAToken.safeTransferFrom(user, address(this), amount);
+
+    // withdraw reserve
+    require(POOL.withdraw(reserve, amount, address(this)) == amount, 'UNEXPECTED_AMOUNT_WITHDRAWN');
+  }
+
+  /**
    * @dev Emergency rescue for token stucked on this contract, as failsafe mechanism
    * - Funds should never remain in this contract more time than during transactions
    * - Only callable by the owner
