@@ -4,31 +4,24 @@ pragma solidity ^0.8.10;
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
 import {IERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol';
 import {IERC20Detailed} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20Detailed.sol';
-import {IERC20WithPermit} from '@aave/core-v3/contracts/interfaces/IERC20WithPermit.sol';
+import {IERC20WithPermit} from 'solidity-utils/contracts/oz-common/interfaces/IERC20WithPermit.sol';
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
 import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
 import {IPriceOracleGetter} from '@aave/core-v3/contracts/interfaces/IPriceOracleGetter.sol';
 import {SafeERC20} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeERC20.sol';
 import {Ownable} from '@aave/core-v3/contracts/dependencies/openzeppelin/contracts/Ownable.sol';
 import {IFlashLoanReceiverBase} from '../interfaces/IFlashLoanReceiverBase.sol';
+import {IBaseParaSwapAdapter} from '../interfaces/IBaseParaSwapAdapter.sol';
 
 /**
  * @title BaseParaSwapAdapter
  * @notice Utility functions for adapters using ParaSwap
  * @author Jason Raymond Bell
  */
-abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
+abstract contract BaseParaSwapAdapter is Ownable, IFlashLoanReceiverBase, IBaseParaSwapAdapter {
   using SafeERC20 for IERC20;
   using SafeERC20 for IERC20Detailed;
   using SafeERC20 for IERC20WithPermit;
-
-  struct PermitSignature {
-    uint256 amount;
-    uint256 deadline;
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-  }
 
   // Max slippage percent allowed
   uint256 public constant MAX_SLIPPAGE_PERCENT = 3000; // 30%
@@ -96,35 +89,35 @@ abstract contract BaseParaSwapAdapter is IFlashLoanReceiverBase, Ownable {
   /**
    * @dev Pull the ATokens from the user and withdraws the underlying asset from the POOL
    * @param reserve address of the asset
-   * @param reserveAToken address of the aToken of the reserve
    * @param user address
    * @param amount of tokens to be transferred to the contract
-   * @param permitSignature struct containing the permit signature
+   * @param permitInput struct containing the permit signature
    */
   function _pullATokenAndWithdraw(
     address reserve,
-    IERC20WithPermit reserveAToken,
     address user,
     uint256 amount,
-    PermitSignature memory permitSignature
+    PermitInput memory permitInput
   ) internal {
     // If deadline is set to zero, assume there is no signature for permit
-    if (permitSignature.deadline != 0) {
-      reserveAToken.permit(
+    if (permitInput.deadline != 0) {
+      permitInput.aToken.permit(
         user,
         address(this),
-        permitSignature.amount,
-        permitSignature.deadline,
-        permitSignature.v,
-        permitSignature.r,
-        permitSignature.s
+        permitInput.value,
+        permitInput.deadline,
+        permitInput.v,
+        permitInput.r,
+        permitInput.s
       );
     }
 
-    // transfer from user to adapter
-    reserveAToken.safeTransferFrom(user, address(this), amount);
+    (, , address reserveAToken) = _getReserveData(reserve);
 
-    // withdraw reserve
+    // transfer from user to adapter
+    IERC20(reserveAToken).safeTransferFrom(user, address(this), amount);
+
+    // // withdraw reserve
     require(POOL.withdraw(reserve, amount, address(this)) == amount, 'UNEXPECTED_AMOUNT_WITHDRAWN');
   }
 

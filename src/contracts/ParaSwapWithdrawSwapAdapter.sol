@@ -43,7 +43,7 @@ abstract contract ParaSwapWithdrawSwapAdapter is
   /// @inheritdoc IParaSwapWithdrawSwapAdapter
   function withdrawAndSwap(
     WithdrawSwapParams memory withdrawSwapParams,
-    BaseParaSwapAdapter.PermitSignature memory permitParams
+    PermitInput memory permitInput
   ) external nonReentrant {
     (, , address aToken) = _getReserveData(withdrawSwapParams.oldAsset);
 
@@ -55,10 +55,9 @@ abstract contract ParaSwapWithdrawSwapAdapter is
 
     _pullATokenAndWithdraw(
       withdrawSwapParams.oldAsset,
-      IERC20WithPermit(aToken),
       msg.sender,
       withdrawSwapParams.oldAssetAmount,
-      permitParams
+      permitInput
     );
 
     uint256 amountReceived = _sellOnParaSwap(
