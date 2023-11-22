@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
-import {ArbitrumScript, EthereumScript, PolygonScript, AvalancheScript, OptimismScript, BaseScript} from 'aave-helpers/ScriptUtils.sol';
+import {ArbitrumScript, EthereumScript, PolygonScript, AvalancheScript, OptimismScript, BaseScript, BNBScript} from 'aave-helpers/ScriptUtils.sol';
 import {AaveGovernanceV2} from 'aave-address-book/AaveGovernanceV2.sol';
 import {AaveV2Ethereum} from 'aave-address-book/AaveV2Ethereum.sol';
 import {AaveV3Ethereum} from 'aave-address-book/AaveV3Ethereum.sol';
@@ -13,6 +13,8 @@ import {AaveV3Avalanche} from 'aave-address-book/AaveV3Avalanche.sol';
 import {AaveV3Optimism} from 'aave-address-book/AaveV3Optimism.sol';
 import {AaveV3Arbitrum} from 'aave-address-book/AaveV3Arbitrum.sol';
 import {AaveV3Base} from 'aave-address-book/AaveV3Base.sol';
+import {AaveV3Bnb} from 'aave-address-book/AaveV3Bnb.sol';
+import {GovernanceV3BNB} from 'aave-address-book/GovernanceV3BNB.sol';
 import {ParaSwapDebtSwapAdapterV3} from '../src/contracts/ParaSwapDebtSwapAdapterV3.sol';
 import {ParaSwapDebtSwapAdapterV3GHO} from '../src/contracts/ParaSwapDebtSwapAdapterV3GHO.sol';
 import {ParaSwapDebtSwapAdapterV2} from '../src/contracts/ParaSwapDebtSwapAdapterV2.sol';
@@ -113,6 +115,17 @@ contract BaseV3 is BaseScript {
       address(AaveV3Base.POOL),
       AugustusRegistry.BASE,
       AaveGovernanceV2.BASE_BRIDGE_EXECUTOR
+    );
+  }
+}
+
+contract BNBV3 is BNBScript {
+  function run() external broadcast {
+    new ParaSwapDebtSwapAdapterV3(
+      IPoolAddressesProvider(address(AaveV3Bnb.POOL_ADDRESSES_PROVIDER)),
+      address(AaveV3Bnb.POOL),
+      AugustusRegistry.BNB,
+      GovernanceV3BNB.EXECUTOR_LVL_1
     );
   }
 }
