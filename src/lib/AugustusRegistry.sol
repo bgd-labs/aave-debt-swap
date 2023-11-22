@@ -18,7 +18,7 @@ library AugustusRegistry {
   IParaSwapAugustusRegistry public constant OPTIMISM =
     IParaSwapAugustusRegistry(0x6e7bE86000dF697facF4396efD2aE2C322165dC3);
 
-  IParaSwapAugustusRegistry public constant BSC =
+  IParaSwapAugustusRegistry public constant BNB =
     IParaSwapAugustusRegistry(0x05b4486f643914a818eD93Afc07457e9074be211);
 
   IParaSwapAugustusRegistry public constant BASE =
