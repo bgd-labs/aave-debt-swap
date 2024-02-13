@@ -6,20 +6,28 @@ import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
 import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
 import {IParaSwapAugustusRegistry} from './dependencies/paraswap/IParaSwapAugustusRegistry.sol';
 import {BaseParaSwapAdapter} from './base/BaseParaSwapAdapter.sol';
-import {ParaSwapDebtSwapAdapter} from './base/ParaSwapDebtSwapAdapter.sol';
+import {ParaSwapLiquiditySwapAdapter} from './base/ParaSwapLiquiditySwapAdapter.sol';
 
 /**
- * @title ParaSwapDebtSwapAdapter
- * @notice ParaSwap Adapter to perform a swap of debt to another debt.
- * @author BGD labs
+ * @title ParaSwapLiquiditySwapAdapterV3
+ * @notice ParaSwap Adapter to perform a swap of collateral from one asset to another.
+ * @dev It is specifically designed for Aave V3
+ * @author Aave Labs
  **/
-contract ParaSwapDebtSwapAdapterV3 is ParaSwapDebtSwapAdapter {
+contract ParaSwapLiquiditySwapAdapterV3 is ParaSwapLiquiditySwapAdapter {
+  /**
+   * @dev Constructor
+   * @param addressesProvider The address of the Aave PoolAddressesProvider contract
+   * @param pool The address of the Aave Pool contract
+   * @param augustusRegistry The address of the Paraswap AugustusRegistry contract
+   * @param owner The address of the owner
+   */
   constructor(
     IPoolAddressesProvider addressesProvider,
     address pool,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
-  ) ParaSwapDebtSwapAdapter(addressesProvider, pool, augustusRegistry, owner) {
+  ) ParaSwapLiquiditySwapAdapter(addressesProvider, pool, augustusRegistry, owner) {
     // Intentionally left blank
   }
 

@@ -2,32 +2,37 @@
 pragma solidity ^0.8.10;
 
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
-import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
-import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
+import {DataTypes, ILendingPool} from 'aave-address-book/AaveV2.sol';
 import {IParaSwapAugustusRegistry} from './dependencies/paraswap/IParaSwapAugustusRegistry.sol';
 import {BaseParaSwapAdapter} from './base/BaseParaSwapAdapter.sol';
-import {ParaSwapDebtSwapAdapter} from './base/ParaSwapDebtSwapAdapter.sol';
+import {ParaSwapRepayAdapter} from './base/ParaSwapRepayAdapter.sol';
 
 /**
- * @title ParaSwapDebtSwapAdapter
- * @notice ParaSwap Adapter to perform a swap of debt to another debt.
- * @author BGD labs
+ * @title ParaSwapRepayAdapterV2
+ * @notice ParaSwap Adapter to repay debt with collateral.
+ * @dev It is specifically designed for Aave V2
+ * @author Aave Labs
  **/
-contract ParaSwapDebtSwapAdapterV3 is ParaSwapDebtSwapAdapter {
+contract ParaSwapRepayAdapterV2 is ParaSwapRepayAdapter {
+  /**
+   * @dev Constructor
+   * @param addressesProvider The address of the Aave PoolAddressesProvider contract
+   * @param pool The address of the Aave Pool contract
+   * @param augustusRegistry The address of the Paraswap AugustusRegistry contract
+   * @param owner The address of the owner
+   */
   constructor(
     IPoolAddressesProvider addressesProvider,
     address pool,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
-  ) ParaSwapDebtSwapAdapter(addressesProvider, pool, augustusRegistry, owner) {
-    // Intentionally left blank
-  }
+  ) ParaSwapRepayAdapter(addressesProvider, pool, augustusRegistry, owner) {}
 
   /// @inheritdoc BaseParaSwapAdapter
   function _getReserveData(
     address asset
   ) internal view override returns (address, address, address) {
-    DataTypes.ReserveData memory reserveData = POOL.getReserveData(asset);
+    DataTypes.ReserveData memory reserveData = ILendingPool(address(POOL)).getReserveData(asset);
     return (
       reserveData.variableDebtTokenAddress,
       reserveData.stableDebtTokenAddress,
@@ -42,6 +47,6 @@ contract ParaSwapDebtSwapAdapterV3 is ParaSwapDebtSwapAdapter {
     address to,
     uint16 referralCode
   ) internal override {
-    POOL.supply(asset, amount, to, referralCode);
+    ILendingPool(address(POOL)).deposit(asset, amount, to, referralCode);
   }
 }
