@@ -24,6 +24,7 @@ const FROM_DECIMALS = Number(args[8]);
 const TO_DECIMALS = Number(args[9]);
 // param only needed for the hash
 // const BLOCK_NUMBER = Number(args[10]);
+const UPDATE_PSP_CACHE = args[11] !== "false";
 
 // generate a hash for input parameters to cache response and not spam psp sdk
 const hash = objectHash(args);
@@ -60,11 +61,11 @@ function augustusFromAmountOffsetFromCalldata(calldata) {
     case "0x19fc5be0": // directBalancerV2GivenOutSwap
       return 68; // 4 + 2 * 32
     case "0x3865bde6": // directCurveV1Swap
-      return 68; // 4 + 2 * 32
+      return 132; // 4 + 4 * 32
     case "0x58f15100": // directCurveV2Swap
       return 68; // 4 + 2 * 32
-    case "0xa6866da9": // directUniV3Swap
-      return 68; // 4 + 2 * 32
+    case "0xa6886da9": // directUniV3Swap
+      return 132; // 4 + 4 * 32
     default:
       throw new Error("Unrecognized function selector for Augustus");
   }
@@ -91,17 +92,17 @@ const augustusToAmountOffsetFromCalldata = (calldata) => {
 
 async function main(from, to, method, amount, user) {
   // check cache and return cache if available
-  const filePath = path.join(process.cwd(), "tests/pspcache", hash);
+  const filePath = path.join(process.cwd(), "src/tests/.pspcache", hash);
   if (fs.existsSync(filePath)) {
     const file = fs.readFileSync(filePath);
     process.stdout.write(file);
     return;
   }
-  // distinguish between exactOut and exactInoutdMethod
-  const excludedMethod =
+  // distinguish between exactOut and exactInOutMethod
+  const includeContractMethods =
     method === "SELL"
-      ? [ContractMethod.simpleSwap]
-      : [ContractMethod.simpleBuy, ContractMethod.directUniV3Buy];
+      ? [ContractMethod.multiSwap, ContractMethod.megaSwap]
+      : [ContractMethod.buy];
   const priceRoute = await paraSwapMin.swap.getRate({
     srcToken: from,
     srcDecimals: FROM_DECIMALS,
@@ -112,7 +113,7 @@ async function main(from, to, method, amount, user) {
     ...(MAX
       ? {
           options: {
-            excludeContractMethods: [...excludedMethod],
+            includeContractMethods: [...includeContractMethods],
           },
         }
       : {}),
@@ -158,8 +159,9 @@ async function main(from, to, method, amount, user) {
     ["(address,bytes,uint256,uint256,uint256)"],
     [[txParams.to, txParams.data, srcAmount, destAmount, offset]]
   );
-
-  fs.writeFileSync(filePath, encodedData);
+  if (UPDATE_PSP_CACHE) {
+    fs.writeFileSync(filePath, encodedData);
+  }
   process.stdout.write(encodedData);
 }
 main(FROM, TO, METHOD, AMOUNT, USER_ADDRESS);
