@@ -38,16 +38,6 @@ abstract contract ParaSwapDebtSwapAdapter is
     address owner
   ) BaseParaSwapBuyAdapter(addressesProvider, pool, augustusRegistry) {
     transferOwnership(owner);
-    // set initial approval for all reserves
-    address[] memory reserves = POOL.getReservesList();
-    for (uint256 i = 0; i < reserves.length; i++) {
-      IERC20WithPermit(reserves[i]).safeApprove(address(POOL), type(uint256).max);
-    }
-  }
-
-  function renewAllowance(address reserve) public {
-    IERC20WithPermit(reserve).safeApprove(address(POOL), 0);
-    IERC20WithPermit(reserve).safeApprove(address(POOL), type(uint256).max);
   }
 
   /**
@@ -131,8 +121,9 @@ abstract contract ParaSwapDebtSwapAdapter is
     // this might lead to a slight excess decrease
     uint256 excess = excessAfter > excessBefore ? excessAfter - excessBefore : 0;
     if (excess > 0) {
-      _conditionalRenewAllowance(debtSwapParams.newDebtAsset, excess);
+      IERC20WithPermit(debtSwapParams.newDebtAsset).safeApprove(address(POOL), excess);
       POOL.repay(debtSwapParams.newDebtAsset, excess, 2, msg.sender);
+      IERC20WithPermit(debtSwapParams.newDebtAsset).safeApprove(address(POOL), 0);
     }
   }
 
@@ -164,6 +155,7 @@ abstract contract ParaSwapDebtSwapAdapter is
    *      enough funds to repay and has approved the Pool to pull the total amount
    * @param assets The addresses of the flash-borrowed assets
    * @param amounts The amounts of the flash-borrowed assets
+   * @param fees The fees of the flash-borrowed assets
    * @param initiator The address of the flashloan initiator
    * @param params The byte-encoded params passed when initiating the flashloan
    * @return True if the execution of the operation succeeds, false otherwise
@@ -171,7 +163,7 @@ abstract contract ParaSwapDebtSwapAdapter is
   function executeOperation(
     address[] calldata assets,
     uint256[] calldata amounts,
-    uint256[] calldata,
+    uint256[] calldata fees,
     address initiator,
     bytes calldata params
   ) external returns (bool) {
@@ -187,7 +179,9 @@ abstract contract ParaSwapDebtSwapAdapter is
       uint256 collateralAmount = amounts[0];
 
       // Supply
+      IERC20WithPermit(collateralAsset).safeApprove(address(POOL), collateralAmount);
       _supply(collateralAsset, collateralAmount, flashParams.user, REFERRER);
+      IERC20WithPermit(collateralAsset).safeApprove(address(POOL), 0);
 
       // Execute the nested flashloan
       address newAsset = flashParams.nestedFlashloanDebtAsset;
@@ -198,7 +192,8 @@ abstract contract ParaSwapDebtSwapAdapter is
       (, , address aToken) = _getReserveData(collateralAsset);
       IERC20WithPermit(aToken).safeTransferFrom(flashParams.user, address(this), collateralAmount); // Could be rounding error but it's insignificant
       POOL.withdraw(collateralAsset, collateralAmount, address(this));
-      _conditionalRenewAllowance(collateralAsset, collateralAmount);
+
+      IERC20WithPermit(collateralAsset).safeApprove(address(POOL), collateralAmount + fees[0]);
     } else {
       // There is no need for additional collateral, execute the swap.
       _swapAndRepay(flashParams, IERC20Detailed(assets[0]), amounts[0]);
@@ -226,14 +221,14 @@ abstract contract ParaSwapDebtSwapAdapter is
       swapParams.debtRepayAmount
     );
 
-    _conditionalRenewAllowance(swapParams.debtAsset, swapParams.debtRepayAmount);
-
+    IERC20WithPermit(swapParams.debtAsset).safeApprove(address(POOL), swapParams.debtRepayAmount);
     POOL.repay(
       address(swapParams.debtAsset),
       swapParams.debtRepayAmount,
       swapParams.debtRateMode,
       swapParams.user
     );
+    IERC20WithPermit(swapParams.debtAsset).safeApprove(address(POOL), 0);
 
     //transfer excess of old debt asset back to the user, if any
     uint256 debtAssetExcess = amountBought - swapParams.debtRepayAmount;
@@ -241,12 +236,5 @@ abstract contract ParaSwapDebtSwapAdapter is
       IERC20WithPermit(swapParams.debtAsset).safeTransfer(swapParams.user, debtAssetExcess);
     }
     return amountSold;
-  }
-
-  function _conditionalRenewAllowance(address asset, uint256 minAmount) internal {
-    uint256 allowance = IERC20(asset).allowance(address(this), address(POOL));
-    if (allowance < minAmount) {
-      renewAllowance(asset);
-    }
   }
 }
