@@ -248,7 +248,7 @@ contract DebtSwapV3Test is BaseTest {
           address(debtSwapAdapter),
           address(AaveV3Ethereum.POOL)
         ),
-        0
+        type(uint256).max
       );
 
       vm.record();

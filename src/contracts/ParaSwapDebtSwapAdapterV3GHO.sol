@@ -28,7 +28,9 @@ contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156Flas
     address pool,
     IParaSwapAugustusRegistry augustusRegistry,
     address owner
-  ) ParaSwapDebtSwapAdapterV3(addressesProvider, pool, augustusRegistry, owner) {}
+  ) ParaSwapDebtSwapAdapterV3(addressesProvider, pool, augustusRegistry, owner) {
+    IERC20(GHO).approve(address(GHO_FLASH_MINTER), type(uint256).max);
+  }
 
   /// @dev ERC-3156 Flash loan callback (in this case flash mint)
   function onFlashLoan(
@@ -46,7 +48,6 @@ contract ParaSwapDebtSwapAdapterV3GHO is ParaSwapDebtSwapAdapterV3, IERC3156Flas
 
     POOL.borrow(GHO, (amountSold + fee), 2, REFERRER, swapParams.user);
 
-    IERC20(GHO).approve(address(GHO_FLASH_MINTER), amount + fee);
     return keccak256('ERC3156FlashBorrower.onFlashLoan');
   }
 
