@@ -217,7 +217,7 @@ abstract contract ParaSwapDebtSwapAdapter is
     IERC20Detailed newDebtAsset,
     uint256 newDebtAmount
   ) internal returns (uint256) {
-    uint256 amountSold = _buyOnParaSwap(
+    (uint256 amountSold, uint256 amountBought) = _buyOnParaSwap(
       swapParams.offset,
       swapParams.paraswapData,
       newDebtAsset,
@@ -234,6 +234,12 @@ abstract contract ParaSwapDebtSwapAdapter is
       swapParams.debtRateMode,
       swapParams.user
     );
+
+    //transfer excess of old debt asset back to the user, if any
+    uint256 debtAssetExcess = amountBought - swapParams.debtRepayAmount;
+    if (debtAssetExcess > 0) {
+      IERC20WithPermit(swapParams.debtAsset).safeTransfer(swapParams.user, debtAssetExcess);
+    }
     return amountSold;
   }
 
